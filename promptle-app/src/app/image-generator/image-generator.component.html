@@ -1,0 +1,38 @@
+<div class="wrap">
+  <button [routerLink]="['back']">
+    Back
+  </button>
+  <h2>ComfyUI Text → Image</h2>
+
+  <form (ngSubmit)="generate()" autocomplete="off" novalidate>
+    <label for="prompt">Prompt</label>
+
+    <textarea
+      id="prompt"
+      name="prompt"
+      [ngModel]="prompt()"
+      (ngModelChange)="prompt.set($event)"
+      rows="3"
+      placeholder="e.g., a cozy cabin by a lake at dusk, cinematic lighting"></textarea>
+    <!-- ^ no whitespace between the tags -->
+    <button type="submit">Generate</button>
+  </form>
+
+
+  @if (loading()) {
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Generating image…</p>
+    </div>
+  }
+
+  @if (error() && !loading()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  @if (imageUrl() && !loading()) {
+    <div class="result">
+      <img [src]="imageUrl()!" alt="Generated" />
+    </div>
+  }
+</div>
