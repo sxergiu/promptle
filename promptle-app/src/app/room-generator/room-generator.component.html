@@ -1,0 +1,85 @@
+<button class="btn-primary"
+        [routerLink]="['back']">
+  Back
+</button>
+<div class="container">
+  <div class="card">
+
+    <!-- Home View -->
+    <div *ngIf="!currentRoomId" class="home-view">
+      <h1 class="title">Room Generator</h1>
+      <p class="subtitle">Create your unique room!</p>
+
+      <button
+        (click)="generateRoom()"
+        class="btn btn-primary">
+        🎮 Generate New Room
+      </button>
+
+      <div *ngIf="generatedLink" class="link-container">
+        <p class="link-label">Your Room Link:</p>
+        <div class="link-input-group">
+          <input
+            [value]="generatedLink"
+            readonly
+            class="link-input">
+          <button
+            (click)="copyLink()"
+            class="btn-copy">
+            {{ copied ? '✓' : '📋' }}
+          </button>
+        </div>
+        <button
+          (click)="joinRoom()"
+          class="btn btn-success">
+          Join This Room
+        </button>
+      </div>
+    </div>
+
+    <!-- Room View -->
+    <div *ngIf="currentRoomId" class="room-view">
+      <div class="room-header">
+        <div class="room-id-badge">
+          <p class="room-id-label">Room ID</p>
+          <p class="room-id-value">{{ currentRoomId }}</p>
+        </div>
+      </div>
+
+      <div class="success-message">
+        <h2 class="success-title">🎉 You're in the room!</h2>
+        <p class="success-text">
+          This is where your game/chat would happen
+        </p>
+      </div>
+
+      <div class="room-actions">
+        <div class="share-box">
+          <p class="share-label">
+            <strong>Share this link:</strong>
+          </p>
+          <code class="share-code">{{ fullRoomUrl }}</code>
+        </div>
+
+        <button
+          (click)="leaveRoom()"
+          class="btn btn-secondary">
+          ← Leave Room
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Rooms List -->
+    <div *ngIf="!currentRoomId && activeRooms.length > 0" class="rooms-list">
+      <p class="rooms-list-title">Previously Created Rooms:</p>
+      <div class="rooms-list-items">
+        <button
+          *ngFor="let room of activeRooms"
+          (click)="navigateToRoom(room)"
+          class="room-item">
+          Room: {{ room }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
