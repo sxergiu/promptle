@@ -1,0 +1,33 @@
+@use 'sass:color';
+
+:host {
+  display: block;
+}
+
+.player-page {
+  min-height: calc(100vh - 80px);
+  background: radial-gradient(circle at top, #f7f7ff 0%, #e5edff 35%, #fdf6ff 70%, #f7fbff 100%);
+}
+
+.player-icon-preview {
+  max-width: 500px;
+  border: 6px solid rgba(255, 255, 255, 0.85);
+  padding: 1.5rem;
+  background: color.scale(#ffffff, $alpha: -10%);
+  box-shadow: 0 20px 55px rgba(16, 24, 40, 0.2);
+}
+
+.card {
+  border-radius: 1.75rem;
+}
+
+.btn-primary {
+  box-shadow: 0 0.625rem 1.5rem rgba(58, 97, 225, 0.3);
+}
+
+@media (max-width: 576px) {
+  .player-icon-preview {
+    max-width: 180px;
+    padding: 1rem;
+  }
+}
