@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 @Injectable({ providedIn: 'root' })
 export class ComfyUiService {
   private http = inject(HttpClient);
-  private readonly base = 'http://127.0.0.1:8188';
+  private readonly base = 'http://127.0.0.1:8000';
   ts = Date.now();
 
   private buildPromptGraph(textPrompt: string) {
