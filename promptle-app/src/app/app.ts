@@ -1,12 +1,11 @@
-import { Component, Inject, PLATFORM_ID, OnInit, ChangeDetectorRef, afterNextRender } from '@angular/core';
-import { CommonModule, isPlatformBrowser } from '@angular/common';
-import {Router, ActivatedRoute, RouterLink, RouterOutlet} from '@angular/router';
-import {ImageGeneratorComponent} from './image-generator/image-generator.component';
+import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { RouterOutlet } from '@angular/router';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, ImageGeneratorComponent, RouterLink, RouterOutlet],
+  imports: [CommonModule, RouterOutlet],
   templateUrl: './app.html',
   styleUrls: ['./app.scss']
 })
