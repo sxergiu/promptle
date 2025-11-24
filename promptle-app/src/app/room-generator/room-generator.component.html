@@ -6,7 +6,8 @@
   <div class="card">
 
     <!-- Home View -->
-    <div *ngIf="!currentRoomId" class="home-view">
+    @if (!currentRoomId()) {
+    <div class="home-view">
       <h1 class="title">Room Generator</h1>
       <p class="subtitle">Create your unique room!</p>
 
@@ -16,17 +17,18 @@
         🎮 Generate New Room
       </button>
 
-      <div *ngIf="generatedLink" class="link-container">
+      @if (generatedLink()) {
+      <div class="link-container">
         <p class="link-label">Your Room Link:</p>
         <div class="link-input-group">
           <input
-            [value]="generatedLink"
+            [value]="generatedLink()"
             readonly
             class="link-input">
           <button
             (click)="copyLink()"
             class="btn-copy">
-            {{ copied ? '✓' : '📋' }}
+            {{ copied() ? '✓' : '📋' }}
           </button>
         </div>
         <button
@@ -35,14 +37,17 @@
           Join This Room
         </button>
       </div>
+      }
     </div>
+    }
 
     <!-- Room View -->
-    <div *ngIf="currentRoomId" class="room-view">
+    @if (currentRoomId()) {
+    <div class="room-view">
       <div class="room-header">
         <div class="room-id-badge">
           <p class="room-id-label">Room ID</p>
-          <p class="room-id-value">{{ currentRoomId }}</p>
+          <p class="room-id-value">{{ currentRoomId() }}</p>
         </div>
       </div>
 
@@ -58,7 +63,7 @@
           <p class="share-label">
             <strong>Share this link:</strong>
           </p>
-          <code class="share-code">{{ fullRoomUrl }}</code>
+          <code class="share-code">{{ fullRoomUrl() }}</code>
         </div>
 
         <button
@@ -68,18 +73,22 @@
         </button>
       </div>
     </div>
+    }
 
     <!-- Active Rooms List -->
-    <div *ngIf="!currentRoomId && activeRooms.length > 0" class="rooms-list">
+    @if (!currentRoomId() && activeRooms().length > 0) {
+    <div class="rooms-list">
       <p class="rooms-list-title">Previously Created Rooms:</p>
       <div class="rooms-list-items">
+        @for (room of activeRooms(); track room) {
         <button
-          *ngFor="let room of activeRooms"
           (click)="navigateToRoom(room)"
           class="room-item">
           Room: {{ room }}
         </button>
+        }
       </div>
     </div>
+    }
   </div>
 </div>
