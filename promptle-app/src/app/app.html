@@ -1,4 +1,8 @@
+<button
+  class="theme-toggle"
+  (click)="theme.toggle()"
+  [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
+  {{ theme.theme() === 'dark' ? '&#9788;' : '&#9790;' }}
+</button>
 
-
-<router-outlet>
-</router-outlet>
+<router-outlet />

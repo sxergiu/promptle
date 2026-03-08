@@ -1,46 +1,164 @@
-.wrap {
-  max-width: 720px;
-  margin: 32px auto;
-  display: grid;
-  gap: 12px;
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+.ig-page {
+  min-height: 100vh;
+  background: radial-gradient(
+    circle at top,
+    var(--page-bg-start) 0%,
+    var(--page-bg-mid) 35%,
+    var(--page-bg-end) 70%,
+    var(--page-bg-last) 100%
+  );
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 3rem 1rem;
+  transition: background 0.3s;
 }
-textarea {
+
+// ── Card ──────────────────────────────────────────────────────────────────────
+
+.ig-card {
+  background: var(--bs-body-bg);
+  border-radius: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 36rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+// ── Back button ───────────────────────────────────────────────────────────────
+
+.ig-back {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--p-gray-light);
+  border-radius: 0.5rem;
+  color: var(--p-gray-dark);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+
+  &:hover {
+    border-color: var(--p-gray-dark);
+    background: var(--bs-tertiary-bg);
+  }
+}
+
+// ── Label / title ─────────────────────────────────────────────────────────────
+
+.ig-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--p-red);
+  margin: 0;
+}
+
+.ig-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--bs-body-color);
+  margin: 0;
+}
+
+// ── Form ──────────────────────────────────────────────────────────────────────
+
+.ig-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.ig-textarea {
   width: 100%;
   font: inherit;
-  padding: 8px 10px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
+  font-size: 0.9rem;
+  padding: 0.65rem 0.875rem;
+  border: 1.5px solid var(--p-gray-light);
+  border-radius: 0.75rem;
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+
+  &::placeholder {
+    color: var(--p-gray-light);
+  }
+
+  &:focus {
+    border-color: var(--p-red);
+    box-shadow: 0 0 0 3px rgba(153, 0, 48, 0.12);
+  }
 }
-button {
-  width: fit-content;
-  padding: 8px 14px;
+
+.ig-btn-generate {
+  align-self: flex-start;
+  padding: 0.6rem 1.5rem;
   border: none;
-  border-radius: 8px;
-  background: #2d6cdf;
+  border-radius: 0.75rem;
+  background: var(--p-red);
   color: #fff;
+  font-weight: 600;
+  font-size: 0.9rem;
   cursor: pointer;
+  transition: filter 0.15s;
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.1);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
 }
-button:hover {
-  filter: brightness(1.05);
+
+// ── Loading ───────────────────────────────────────────────────────────────────
+
+.ig-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
-.loading {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  padding: 16px;
-}
-.spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid #ddd;
-  border-top-color: #2d6cdf;
+
+.ig-spinner {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: 2px solid var(--p-gray-light);
+  border-top-color: var(--p-red);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
-.error { color: #c00; }
-.result img {
-  max-width: 100%;
-  border-radius: 10px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.ig-loading-text {
+  font-size: 0.875rem;
+  color: var(--bs-secondary-color);
+  margin: 0;
+}
+
+// ── States ────────────────────────────────────────────────────────────────────
+
+.ig-error {
+  font-size: 0.875rem;
+  color: var(--p-red);
+  margin: 0;
+}
+
+.ig-result img {
+  width: 100%;
+  border-radius: 1rem;
+  border: 1px solid var(--p-gray-light);
 }

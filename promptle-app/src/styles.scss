@@ -1,3 +1,151 @@
 @use 'bootstrap/scss/bootstrap';
 
-/* You can add global styles to this file, and also import other style files */
+// ── Brand palette ─────────────────────────────────────────────────────────────
+// #628266  sage green   — confirm / join / positive actions
+// #990030  deep crimson — primary CTA, accents, badges
+// #000000  black        — dark backgrounds, strong text
+// #B4B4B4  light gray   — borders, muted text, disabled states
+// #464646  dark gray    — body text (light mode), card bg (dark mode)
+// ─────────────────────────────────────────────────────────────────────────────
+
+:root {
+  // Palette tokens
+  --p-green: #628266;
+  --p-red: #990030;
+  --p-black: #000000;
+  --p-gray-light: #b4b4b4;
+  --p-gray-dark: #464646;
+
+  // Override Bootstrap semantic tokens to follow the palette
+  --bs-primary: #990030;
+  --bs-primary-rgb: 153, 0, 48;
+  --bs-link-color: #990030;
+  --bs-link-hover-color: #6b0021;
+  --bs-border-color: #b4b4b4;
+  --bs-border-color-translucent: rgba(180, 180, 180, 0.175);
+  --bs-secondary-color: #464646;
+  --bs-focus-ring-color: rgba(153, 0, 48, 0.25);
+
+  // Page background (light mode) — warm near-white grays
+  --page-bg-start: #f8f6f6;
+  --page-bg-mid: #f0ecec;
+  --page-bg-end: #f5f3f3;
+  --page-bg-last: #f8f6f6;
+
+  // Room page gradient — desaturated palette hues
+  --room-bg-gradient: linear-gradient(135deg, #8b5a65 0%, #506858 100%);
+
+  // Room success block
+  --room-success-bg: #edf2ee;
+
+  // Share code color
+  --room-code-color: #990030;
+
+  // SVG icon filters — applied directly to <img> elements, no background needed
+  // Default: render icon as dark gray (#464646)
+  --icon-filter-default: brightness(0) opacity(0.6);
+  // Accent: render icon as crimson (#990030)
+  --icon-filter-accent: brightness(0) saturate(100%) invert(12%) sepia(78%) saturate(3500%) hue-rotate(329deg) brightness(78%) contrast(123%);
+}
+
+[data-bs-theme='dark'] {
+  --bs-primary: #cc3358;
+  --bs-primary-rgb: 204, 51, 88;
+  --bs-link-color: #cc3358;
+  --bs-link-hover-color: #e05575;
+  --bs-border-color: #464646;
+  --bs-border-color-translucent: rgba(70, 70, 70, 0.175);
+  --bs-secondary-color: #b4b4b4;
+  --bs-focus-ring-color: rgba(204, 51, 88, 0.3);
+
+  // Page background (dark mode) — near-black
+  --page-bg-start: #0a0a0a;
+  --page-bg-mid: #141414;
+  --page-bg-end: #0f0f0f;
+  --page-bg-last: #0a0a0a;
+
+  // Room page gradient (muted dark versions)
+  --room-bg-gradient: linear-gradient(135deg, #2a1519 0%, #151f18 100%);
+
+  // Room success block
+  --room-success-bg: #162019;
+
+  // Share code color
+  --room-code-color: #b4b4b4;
+
+  // SVG icon filters — dark mode
+  // Default: render icon as light gray (#b4b4b4)
+  --icon-filter-default: brightness(0) invert(1) opacity(0.65);
+  // Accent: render icon as light crimson (#cc3358)
+  --icon-filter-accent: brightness(0) saturate(100%) invert(36%) sepia(46%) saturate(2000%) hue-rotate(316deg) brightness(105%) contrast(110%);
+}
+
+// Override Bootstrap's compiled btn-primary (SCSS vars bake values at build time,
+// so CSS custom property overrides on :root don't reach it — must use btn CSS vars)
+.btn-primary {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: #990030;
+  --bs-btn-border-color: #990030;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #6b0021;
+  --bs-btn-hover-border-color: #6b0021;
+  --bs-btn-active-bg: #6b0021;
+  --bs-btn-active-border-color: #6b0021;
+  --bs-btn-disabled-bg: #b4b4b4;
+  --bs-btn-disabled-color: #464646;
+  --bs-btn-disabled-border-color: #b4b4b4;
+}
+
+// ── CSS-only tooltips ─────────────────────────────────────────────────────────
+// Usage: add data-tooltip="Label" to any element
+
+[data-tooltip] {
+  position: relative;
+
+  &::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--p-black);
+    color: var(--p-gray-light);
+    font-size: 0.7rem;
+    font-weight: 500;
+    white-space: nowrap;
+    padding: 0.3rem 0.65rem;
+    border-radius: 0.4rem;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 1060;
+  }
+
+  &:hover::after {
+    opacity: 1;
+  }
+}
+
+.theme-toggle {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 1050;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: 1px solid var(--p-gray-light);
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+
+  &:hover {
+    background: var(--bs-secondary-bg);
+  }
+}
