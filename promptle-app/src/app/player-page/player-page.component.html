@@ -1,45 +1,41 @@
-<div class="player-page py-5 py-lg-5">
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-7 col-xl-6">
-        <div class="card shadow border-0 overflow-hidden">
-          <div class="card-body p-4 p-lg-5">
-            <p class="text-uppercase text-primary fw-semibold small mb-2">Player Setup</p>
-            <h1 class="display-6 fw-semibold mb-4">Who are you?</h1>
-
-            <div class="d-flex justify-content-end">
-              <button type="button"
-                      class="btn px-4"
-                      (click)="randomizeIcon()">
-                🎲
-              </button>
-            </div>
-
-            <div class="text-center mb-4">
-              <img class="player-icon-preview img-fluid rounded-circle"
-                   [src]="selectedIcon()"
-                   alt="Selected player icon">
-            </div>
-
-            <form class="vstack gap-3" (submit)="$event.preventDefault()">
-              <div>
-                <input id="playerName"
-                       class="form-control form-control-lg"
-                       type="text"
-                       placeholder="Enter your player name"
-                       [value]="username()"
-                       (input)="handleUsernameInput($any($event.target).value)">
-              </div>
-
-              <button type="submit"
-                      class="btn btn-primary btn-lg mt-3"
-                      [disabled]="!usernameIsValid()">
-                Continue
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
+@if (standalone) {
+<div class="player-page">
+  <div class="pp-card">
+    <ng-container [ngTemplateOutlet]="form" />
+    <button type="submit"
+            class="btn btn-primary pp-continue"
+            [disabled]="!player.isValid()"
+            data-tooltip="Continue to room generator">
+      Continue
+    </button>
   </div>
 </div>
+} @else {
+  <div class="pp-embedded">
+    <ng-container [ngTemplateOutlet]="form" />
+  </div>
+}
+
+<ng-template #form>
+  <p class="pp-label">Player Setup</p>
+
+  <div class="pp-icon-row">
+    <img class="pp-icon-preview"
+         [src]="player.selectedIcon()"
+         alt="Selected player icon">
+    <button type="button"
+            class="pp-dice-btn"
+            (click)="player.randomizeIcon()"
+            aria-label="Randomize icon"
+            data-tooltip="Randomize icon">
+      <img src="app-icons/promptle-dice.svg" class="pp-dice-img" alt="">
+    </button>
+  </div>
+
+  <input id="playerName"
+         class="pp-input"
+         type="text"
+         placeholder="Enter your name"
+         [value]="player.username()"
+         (input)="player.setUsername($any($event.target).value)">
+</ng-template>
