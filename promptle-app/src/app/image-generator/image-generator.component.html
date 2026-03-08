@@ -1,37 +1,40 @@
-<div class="wrap">
-  <button [routerLink]="['back']">
-    Back
-  </button>
-  <h2>ComfyUI Text → Image</h2>
+<div class="ig-page">
+  <div class="ig-card">
+    <button class="ig-back" [routerLink]="['back']">Back</button>
 
-  <form (ngSubmit)="generate()" autocomplete="off" novalidate>
-    <label for="prompt">Prompt</label>
+    <p class="ig-label">Image Generator</p>
+    <h1 class="ig-title">Write a prompt</h1>
 
-    <textarea
-      id="prompt"
-      name="prompt"
-      [ngModel]="prompt()"
-      (ngModelChange)="prompt.set($event)"
-      rows="3"
-      placeholder="e.g., a cozy cabin by a lake at dusk, cinematic lighting"></textarea>
-    <button type="submit">Generate</button>
-  </form>
+    <form (ngSubmit)="generate()" autocomplete="off" novalidate class="ig-form">
+      <textarea
+        id="prompt"
+        name="prompt"
+        class="ig-textarea"
+        [ngModel]="prompt()"
+        (ngModelChange)="prompt.set($event)"
+        rows="3"
+        placeholder="e.g., a cozy cabin by a lake at dusk, cinematic lighting"></textarea>
 
+      <button type="submit" class="ig-btn-generate" [disabled]="loading()">
+        Generate
+      </button>
+    </form>
 
-  @if (loading()) {
-    <div class="loading">
-      <div class="spinner"></div>
-      <p>Generating image…</p>
-    </div>
-  }
+    @if (loading()) {
+      <div class="ig-loading">
+        <div class="ig-spinner"></div>
+        <p class="ig-loading-text">Generating…</p>
+      </div>
+    }
 
-  @if (error() && !loading()) {
-    <p class="error">{{ error() }}</p>
-  }
+    @if (error() && !loading()) {
+      <p class="ig-error">{{ error() }}</p>
+    }
 
-  @if (imageUrl() && !loading()) {
-    <div class="result">
-      <img [src]="imageUrl()!" alt="Generated" />
-    </div>
-  }
+    @if (imageUrl() && !loading()) {
+      <div class="ig-result">
+        <img [src]="imageUrl()!" alt="Generated image" />
+      </div>
+    }
+  </div>
 </div>
