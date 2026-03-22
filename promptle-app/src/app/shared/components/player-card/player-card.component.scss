@@ -1,0 +1,52 @@
+.player-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.player-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.player-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.player-alias {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.crown {
+  font-size: 1.125rem;
+}
+
+.me-label {
+  font-size: 0.75rem;
+  color: #9e9e9e;
+  font-style: italic;
+}
+
+.kick-btn {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+  color: #d32f2f;
+  border: 1px solid #d32f2f;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+
+  &:hover {
+    background: #fde8e8;
+  }
+}
