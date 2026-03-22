@@ -34,6 +34,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 @Service
 @Transactional
@@ -125,8 +126,8 @@ public class RoomService {
         player.setJoinedAt(Instant.now());
         player = playerRepository.save(player);
 
-        List<Player> allPlayers = playerRepository.findByRoom(room);
-        publishRoomEvent(roomCode, RoomEventType.PLAYER_JOINED, allPlayers, room.getHostId());
+        List<Player> connectedPlayers = playerRepository.findByRoomAndConnectedTrue(room);
+        publishRoomEvent(roomCode, RoomEventType.PLAYER_JOINED, connectedPlayers, room.getHostId());
 
         return new JoinRoomResponse(player.getToken().toString(), roomCode, player.getId().toString());
     }
@@ -167,8 +168,12 @@ public class RoomService {
             serverTimestamp = 0L;
         }
 
-        List<Player> allPlayers = playerRepository.findByRoom(room);
-        GameStateSnapshot base = roomMapper.toSnapshot(room, allPlayers, timerSeconds, serverTimestamp, imageUrl);
+        List<Player> connectedPlayers = playerRepository.findByRoomAndConnectedTrue(room);
+        // Always include the requesting player even if not yet connected (WS handshake hasn't fired yet)
+        List<Player> snapshotPlayers = connectedPlayers.stream().anyMatch(p -> p.getId().equals(player.getId()))
+                ? connectedPlayers
+                : Stream.concat(connectedPlayers.stream(), Stream.of(player)).toList();
+        GameStateSnapshot base = roomMapper.toSnapshot(room, snapshotPlayers, timerSeconds, serverTimestamp, imageUrl);
 
         boolean hasSubmitted = computeHasSubmitted(player, room);
 
