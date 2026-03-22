@@ -1,0 +1,45 @@
+<div class="join-container">
+  <header class="join-header">
+    <h1 class="logo">Promptle</h1>
+    <p class="tagline">The AI Telephone</p>
+  </header>
+
+  <main class="join-main">
+    <div class="avatar-section">
+      <img [src]="selectedIcon.path" [alt]="selectedIcon.id" class="avatar-img" />
+      <button type="button" class="shuffle-btn" (click)="shuffleIcon()" aria-label="Shuffle avatar">
+        &#x21BB; Shuffle
+      </button>
+    </div>
+
+    <div class="form-section">
+      <input
+        type="text"
+        [value]="alias()"
+        (input)="alias.set($any($event.target).value)"
+        placeholder="Enter your name"
+        class="alias-input"
+        aria-label="Alias"
+      />
+
+      @if (errorMessage) {
+        <div class="error-message">{{ errorMessage }}</div>
+      }
+
+      <button
+        type="button"
+        class="join-room-btn"
+        [disabled]="!alias().trim()"
+        (click)="onJoinRoom()"
+      >
+        Continue to Room
+      </button>
+    </div>
+  </main>
+
+  <footer class="join-footer">
+    <a href="#" class="footer-link">How to Play</a>
+    <a href="#" class="footer-link">About</a>
+    <a href="#" class="footer-link">Privacy Policy</a>
+  </footer>
+</div>
