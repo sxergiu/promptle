@@ -1,0 +1,7 @@
+export enum GamePhase {
+  LOBBY = 'LOBBY',
+  PROMPTING = 'PROMPTING',
+  GENERATING = 'GENERATING',
+  GUESSING = 'GUESSING',
+  RESULTS = 'RESULTS'
+}
