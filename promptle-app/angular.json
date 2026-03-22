@@ -61,6 +61,9 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "proxyConfig": "proxy.conf.json"
+          },
           "configurations": {
             "production": {
               "buildTarget": "promptle-app:build:production"
@@ -77,6 +80,7 @@
         "test": {
           "builder": "@angular/build:karma",
           "options": {
+            "main": "src/test-main.ts",
             "tsConfig": "tsconfig.spec.json",
             "inlineStyleLanguage": "scss",
             "assets": [
