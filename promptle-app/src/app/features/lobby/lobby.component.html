@@ -1,0 +1,49 @@
+@if (duplicateSession()) {
+  <div class="duplicate-overlay">
+    <div class="duplicate-dialog">
+      <p>You are already in this lobby from another tab.</p>
+      <button type="button" (click)="exitLobby()">Go to Home</button>
+    </div>
+  </div>
+}
+
+<div class="lobby-container">
+  <div class="lobby-header">
+    <h1>Lobby — {{ roomCode }}</h1>
+    <button class="settings-btn" type="button" aria-label="Settings">
+      <span class="material-icons">settings</span>
+    </button>
+  </div>
+
+  <div class="player-list">
+    @for (player of players(); track player.id) {
+      <app-player-card
+        [alias]="player.alias"
+        [avatarId]="player.avatarId"
+        [isHost]="player.id === hostId()"
+        [isCurrentPlayer]="player.id === playerId"
+      />
+    }
+  </div>
+
+  <div class="lobby-actions">
+    @if (isHost()) {
+      <button type="button" class="invite-btn" (click)="inviteOthers()">
+        Invite Others
+      </button>
+    }
+
+    <button
+      type="button"
+      class="start-btn"
+      [disabled]="!isHost() || players().length < 2"
+      (click)="startGame()"
+    >
+      Start Game
+    </button>
+
+    <button type="button" class="exit-btn" (click)="exitLobby()">
+      Exit Lobby
+    </button>
+  </div>
+</div>
