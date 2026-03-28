@@ -9,8 +9,9 @@ export class ThemeService {
   constructor() {
     if (this.isBrowser) {
       effect(() => {
-        document.documentElement.setAttribute('data-theme', this.theme());
-        localStorage.setItem('theme', this.theme());
+        const t = this.theme();
+        document.documentElement.setAttribute('data-theme', t);
+        localStorage.setItem('theme', t);
       });
     }
   }

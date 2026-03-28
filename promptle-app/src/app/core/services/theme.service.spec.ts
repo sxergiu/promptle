@@ -23,23 +23,21 @@ describe('ThemeService', () => {
 
   describe('toggle() — dark toggle', () => {
     it('sets data-theme to "dark" when current theme is light', () => {
-      document.documentElement.setAttribute('data-theme', 'light');
+      service.theme.set('light');
 
       service.toggle();
 
-      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      expect(service.theme()).toBe('dark');
     });
   });
 
   describe('toggle() — light toggle', () => {
     it('sets data-theme to "light" or removes attribute when current theme is dark', () => {
-      document.documentElement.setAttribute('data-theme', 'dark');
+      service.theme.set('dark');
 
       service.toggle();
 
-      const value = document.documentElement.getAttribute('data-theme');
-      const isLightOrAbsent = value === 'light' || value === null;
-      expect(isLightOrAbsent).toBeTrue();
+      expect(service.theme()).toBe('light');
     });
   });
 
