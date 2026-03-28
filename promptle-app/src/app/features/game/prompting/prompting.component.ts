@@ -6,21 +6,8 @@ import { WebSocketService } from '../../../core/services/websocket.service';
   selector: 'app-prompting',
   standalone: true,
   imports: [MatButtonModule],
-  template: `
-    <div>
-      <textarea
-        [readOnly]="submitted()"
-        [value]="promptText()"
-        (input)="promptText.set($any($event.target).value)"
-      ></textarea>
-      <span>{{ submittedCount }} / {{ totalCount }} ready</span>
-      <button
-        mat-raised-button
-        [disabled]="submitted() || promptText().length === 0"
-        (click)="onSubmit()"
-      >Ready</button>
-    </div>
-  `,
+  styleUrl: './prompting.component.scss',
+  templateUrl: './prompting.component.html',
 })
 export class PromptingPhaseComponent implements OnInit {
   @Input() roomCode: string = '';
@@ -40,7 +27,7 @@ export class PromptingPhaseComponent implements OnInit {
   }
 
   onSubmit(): void {
-    if (this.submitted() || this.promptText().length === 0) return;
+    if (this.submitted() || this.promptText().trim().length === 0) return;
     this.webSocketService.send(`/app/room/${this.roomCode}/prompt`, { text: this.promptText() });
     this.submitted.set(true);
   }
