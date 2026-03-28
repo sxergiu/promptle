@@ -2,15 +2,14 @@ package com.app.promptle.game.web;
 
 import com.app.promptle.game.dto.SubmissionPayload;
 import com.app.promptle.game.service.GameService;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
 import java.util.UUID;
 
-/**
- * Stub — fully implemented in a later chunk.
- * Handles WebSocket messages for game submissions.
- */
 @Controller
 public class GameController {
 
@@ -20,17 +19,24 @@ public class GameController {
         this.gameService = gameService;
     }
 
-    public void handlePrompt(String roomCode, SubmissionPayload payload, Principal principal) {
+    @MessageMapping("/room/{roomCode}/prompt")
+    public void handlePrompt(@DestinationVariable String roomCode,
+                             @Payload SubmissionPayload payload,
+                             Principal principal) {
         UUID playerId = UUID.fromString(principal.getName());
         gameService.submitPrompt(roomCode, playerId, payload.text());
     }
 
-    public void handleGuess(String roomCode, SubmissionPayload payload, Principal principal) {
+    @MessageMapping("/room/{roomCode}/guess")
+    public void handleGuess(@DestinationVariable String roomCode,
+                            @Payload SubmissionPayload payload,
+                            Principal principal) {
         UUID playerId = UUID.fromString(principal.getName());
         gameService.submitGuess(roomCode, playerId, payload.text());
     }
 
-    public void handleNextChain(String roomCode, Principal principal) {
+    @MessageMapping("/room/{roomCode}/next-chain")
+    public void handleNextChain(@DestinationVariable String roomCode, Principal principal) {
         UUID playerId = UUID.fromString(principal.getName());
         gameService.advanceShowcase(roomCode, playerId);
     }

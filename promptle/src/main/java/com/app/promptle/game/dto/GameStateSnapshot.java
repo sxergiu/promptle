@@ -13,6 +13,7 @@ public record GameStateSnapshot(
         long serverTimestamp,
         String imageUrl,
         boolean hasSubmitted,
+        int submittedCount,
         List<PlayerDto> players,
         String hostId
 ) {}
