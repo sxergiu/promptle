@@ -41,6 +41,7 @@ public class GameWebSocketBroadcaster {
         messagingTemplate.convertAndSend("/topic/game/" + event.roomCode(), dto);
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onSubmissionUpdate(SubmissionUpdateApplicationEvent event) {
         SubmissionUpdateEvent dto = new SubmissionUpdateEvent(
                 event.submittedCount(), event.totalCount()
@@ -60,10 +61,12 @@ public class GameWebSocketBroadcaster {
         }
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onGameResults(GameResultsApplicationEvent event) {
         messagingTemplate.convertAndSend("/topic/game/" + event.roomCode(), event.payload());
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onShowcaseAdvanced(ShowcaseApplicationEvent event) {
         ShowcaseAdvancedEvent dto = new ShowcaseAdvancedEvent(event.chainIndex());
         messagingTemplate.convertAndSend("/topic/game/" + event.roomCode(), dto);
