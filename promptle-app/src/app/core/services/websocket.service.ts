@@ -5,13 +5,14 @@ import { Client, StompSubscription } from '@stomp/stompjs';
 export class WebSocketService {
   private client!: Client;
 
-  connect(token: string, roomCode: string, onConnect?: () => void, reconnectDelay = 5000): void {
+  connect(token: string, roomCode: string, onConnect?: () => void, reconnectDelay = 5000, onDisconnect?: () => void): void {
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const host = window.location.host;
     this.client = new Client({
       brokerURL: `${protocol}://${host}/ws?token=${token}&roomCode=${roomCode}`,
       reconnectDelay,
       onConnect: () => onConnect?.(),
+      onDisconnect: () => onDisconnect?.(),
     });
     this.client.activate();
   }
