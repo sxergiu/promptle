@@ -65,4 +65,11 @@ public class RoomController {
         gameService.startGame(roomCode, player.getId());
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("/{roomCode}/reset")
+    public ResponseEntity<Void> resetGame(@PathVariable String roomCode,
+                                           @RequestParam String token) {
+        roomService.resetGame(roomCode, token);
+        return ResponseEntity.ok().build();
+    }
 }

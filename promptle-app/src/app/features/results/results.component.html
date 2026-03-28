@@ -1,0 +1,74 @@
+
+    <div class="results-shell">
+      <header class="results-header page-header">
+        <h1 class="results-title">Results</h1>
+        <span class="chain-indicator">Chain {{ currentChainIndex() + 1 }} / {{ chains().length }}</span>
+      </header>
+
+      <div class="chain-dots">
+        @for (chain of chains(); track $index; let i = $index) {
+          <div class="dot"
+               [class.active]="i === currentChainIndex()"
+               [class.done]="i < currentChainIndex()"
+               [class.clickable]="i < currentChainIndex() || allChainsCompleted()"
+               (click)="navigateToChain(i)"
+               [attr.title]="(i < currentChainIndex() || allChainsCompleted()) ? 'Chain ' + (i + 1) : null">
+          </div>
+        }
+      </div>
+
+      <div class="entries-feed">
+        @for (chain of chains(); track $index) {
+          @if ($index === currentChainIndex()) {
+            @for (entry of chain.entries; track $index; let i = $index) {
+              @if (i < revealedEntryCount()) {
+                <div class="entry-row">
+                  <div class="entry-bubble-wrap">
+                    @if (entry.avatarId) {
+                      <img [src]="getAvatarPath(entry.avatarId)" class="entry-avatar" [alt]="entry.avatarId" />
+                    } @else {
+                      <div class="entry-avatar"></div>
+                    }
+                    <div class="entry-content">
+                      <div class="entry-author">
+                        {{ getPlayerName(entry.playerId) }}{{ entry.isPlaceholder ? ' (skipped)' : '' }}
+                      </div>
+                      <div class="entry-bubble" [class.placeholder-bubble]="entry.isPlaceholder">
+                        {{ entry.text }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                @if (entry.imageUrl) {
+                  <div class="entry-row entry-row--image">
+                    <div class="entry-bubble-wrap entry-bubble-wrap--right">
+                      <div class="entry-content entry-content--right">
+                        <div class="entry-author entry-author--right">Promptle</div>
+                        <div class="entry-image-bubble">
+                          <img [src]="entry.imageUrl" class="entry-image" alt="Generated image" />
+                        </div>
+                      </div>
+                      <img src="logos.ico" class="entry-avatar entry-avatar--app" alt="Promptle" />
+                    </div>
+                  </div>
+                }
+              }
+            }
+          }
+        }
+      </div>
+
+      <div class="results-actions">
+        <button mat-icon-button (click)="onExportThread()" aria-label="Export thread" title="Export thread">
+          <mat-icon>download</mat-icon>
+        </button>
+        <button
+          mat-raised-button
+          class="btn-green"
+          [disabled]="!canProceed() || (currentChainIndex() < chains().length - 1 && !isHost())"
+          (click)="currentChainIndex() < chains().length - 1 ? onNextChain() : onBackToLobby()"
+        >
+          {{ currentChainIndex() < chains().length - 1 ? 'Next Chain →' : 'Back to Lobby' }}
+        </button>
+      </div>
+    </div>

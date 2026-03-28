@@ -14,4 +14,6 @@ public interface RoundAssignmentRepository extends JpaRepository<RoundAssignment
     Optional<RoundAssignment> findByRoomAndRoundAndPlayer(Room room, int round, Player player);
 
     List<RoundAssignment> findByRoom(Room room);
+
+    void deleteAllByRoom(Room room);
 }

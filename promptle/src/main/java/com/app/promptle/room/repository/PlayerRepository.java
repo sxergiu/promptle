@@ -15,4 +15,6 @@ public interface PlayerRepository extends JpaRepository<Player, UUID> {
     List<Player> findByRoom(Room room);
 
     List<Player> findByRoomAndConnectedTrue(Room room);
+
+    List<Player> findByRoomAndConnectedFalse(Room room);
 }

@@ -133,7 +133,7 @@ class GameWebSocketBroadcasterTest {
                 player1, "/api/images/game/img1",
                 player2, "/api/images/game/img2"
         );
-        RoundReadyApplicationEvent event = new RoundReadyApplicationEvent("ABCD1234", imageUrls);
+        RoundReadyApplicationEvent event = new RoundReadyApplicationEvent("ABCD1234", 2, imageUrls);
 
         broadcaster.onRoundReady(event);
 
@@ -145,7 +145,7 @@ class GameWebSocketBroadcasterTest {
     void onRoundReady_DoesNotBroadcast_OnlyPerPlayerMessages() {
         UUID player1 = UUID.randomUUID();
         Map<UUID, String> imageUrls = Map.of(player1, "/api/images/game/img1");
-        RoundReadyApplicationEvent event = new RoundReadyApplicationEvent("ABCD1234", imageUrls);
+        RoundReadyApplicationEvent event = new RoundReadyApplicationEvent("ABCD1234", 2, imageUrls);
 
         broadcaster.onRoundReady(event);
 
@@ -159,7 +159,7 @@ class GameWebSocketBroadcasterTest {
         UUID player1 = UUID.randomUUID();
         String url1 = "/api/images/game/img-player1";
         Map<UUID, String> imageUrls = Map.of(player1, url1);
-        RoundReadyApplicationEvent event = new RoundReadyApplicationEvent("ABCD1234", imageUrls);
+        RoundReadyApplicationEvent event = new RoundReadyApplicationEvent("ABCD1234", 2, imageUrls);
 
         broadcaster.onRoundReady(event);
 
@@ -168,7 +168,7 @@ class GameWebSocketBroadcasterTest {
                 eq("/queue/game"),
                 argThat(payload -> {
                     if (payload instanceof RoundReadyPayload rrp) {
-                        return url1.equals(rrp.imageUrl());
+                        return url1.equals(rrp.imageUrl()) && rrp.round() == 2;
                     }
                     return true;
                 })
@@ -277,7 +277,7 @@ class GameWebSocketBroadcasterTest {
     void onRoundReady_DoesNotCallConvertAndSend_ThreeArgOverload() {
         UUID player1 = UUID.randomUUID();
         Map<UUID, String> imageUrls = Map.of(player1, "/api/images/game/img1");
-        RoundReadyApplicationEvent event = new RoundReadyApplicationEvent("ABCD1234", imageUrls);
+        RoundReadyApplicationEvent event = new RoundReadyApplicationEvent("ABCD1234", 2, imageUrls);
 
         broadcaster.onRoundReady(event);
 

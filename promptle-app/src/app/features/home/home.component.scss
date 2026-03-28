@@ -1,36 +1,63 @@
-.home-container {
+.home-shell {
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  min-height: 100vh;
-  padding: 2rem 1rem;
-  box-sizing: border-box;
 }
 
 .home-header {
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
   text-align: center;
-  margin-bottom: 2rem;
 }
 
 .logo {
-  font-size: 3rem;
+  font-size: 1rem;
   font-weight: 900;
   margin: 0;
+  letter-spacing: 0.04em;
+  color: var(--color-primary);
+  position: relative;
 }
 
 .tagline {
-  font-size: 1.125rem;
-  color: #666;
-  margin: 0.25rem 0 0;
+  font-size: 0.5rem;
+  color: var(--color-primary);
+  opacity: 0.7;
+  margin: 0;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 500;
+  position: relative;
+}
+
+.home-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
 }
 
 .home-main {
+  background: var(--color-surface);
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 var(--color-primary);
+  border: 2px solid var(--color-primary);
+  padding: 2rem 1.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1.5rem;
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
+  animation: cardIn 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(32px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .avatar-section {
@@ -41,22 +68,26 @@
 }
 
 .avatar-img {
-  width: 96px;
-  height: 96px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
   object-fit: cover;
+  border: 3px solid var(--color-border);
+  background: var(--avatar-bg);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s, border-color 0.25s;
+
+  &:hover {
+    transform: scale(1.07);
+    box-shadow: 0 0 0 4px rgba(153, 0, 48, 0.18), 0 4px 16px rgba(153, 0, 48, 0.12);
+    border-color: var(--color-primary);
+  }
 }
 
 .shuffle-btn {
-  padding: 0.4rem 1rem;
-  cursor: pointer;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #fff;
-
-  &:hover {
-    background: #f5f5f5;
-  }
+  font-size: 0.8rem;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  &:hover { opacity: 1; }
 }
 
 .form-section {
@@ -66,49 +97,37 @@
   width: 100%;
 }
 
-.alias-input {
-  width: 100%;
-  padding: 0.625rem 0.75rem;
-  font-size: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-sizing: border-box;
-}
-
+// Primary CTA button gradient override — targets the Angular Material raised button
 .create-room-btn {
-  width: 100%;
-  padding: 0.75rem;
-  font-size: 1rem;
-  font-weight: 600;
-  background: #1976d2;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #6b0021 100%) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.03em;
+  box-shadow: 0 4px 16px rgba(153, 0, 48, 0.3) !important;
+  transition: box-shadow 0.2s, transform 0.15s !important;
 
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  &:hover:not([disabled]) {
+    box-shadow: 0 6px 24px rgba(153, 0, 48, 0.4) !important;
+    transform: translateY(-1px);
   }
 
-  &:not(:disabled):hover {
-    background: #1565c0;
+  &:active:not([disabled]) {
+    transform: translateY(0);
   }
 }
 
 .home-footer {
-  margin-top: auto;
-  padding-top: 2rem;
+  padding: 1.5rem;
   display: flex;
+  justify-content: center;
   gap: 1.5rem;
 }
 
 .footer-link {
   font-size: 0.8rem;
-  color: #999;
+  color: var(--color-on-surface);
+  opacity: 0.4;
   text-decoration: none;
-
-  &:hover {
-    color: #555;
-  }
+  transition: opacity 0.2s;
+  &:hover { opacity: 0.8; }
 }
