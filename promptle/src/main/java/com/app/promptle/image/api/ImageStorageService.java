@@ -21,4 +21,12 @@ public interface ImageStorageService {
      * @param gameId the room's UUID as a string
      */
     void deleteGame(String gameId);
+
+    /**
+     * Deletes individual images by their URL paths.
+     * URLs are in the format /api/images/{gameId}/{imageId}.
+     *
+     * @param urls list of URL paths returned by {@link #store}
+     */
+    void deleteImages(java.util.List<String> urls);
 }

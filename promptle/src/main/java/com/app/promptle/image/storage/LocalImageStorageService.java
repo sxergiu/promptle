@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Stream;
 
 /**
@@ -37,6 +38,23 @@ public class LocalImageStorageService implements ImageStorageService {
             return "/api/images/" + gameId + "/" + imageId;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
+    public void deleteImages(List<String> urls) {
+        // URL format: /api/images/{gameId}/{imageId}
+        for (String url : urls) {
+            String[] parts = url.split("/");
+            if (parts.length < 5) continue; // malformed, skip
+            String gameId = parts[3];
+            String imageId = parts[4];
+            Path file = Paths.get(basePath, gameId, imageId + ".png");
+            try {
+                Files.deleteIfExists(file);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
     }
 

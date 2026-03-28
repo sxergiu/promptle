@@ -14,4 +14,6 @@ public interface ChainRepository extends JpaRepository<Chain, UUID> {
     List<Chain> findByRoom(Room room);
 
     Optional<Chain> findByRoomAndOriginPlayer(Room room, Player player);
+
+    void deleteAllByRoom(Room room);
 }

@@ -21,4 +21,8 @@ public interface ChainEntryRepository extends JpaRepository<ChainEntry, UUID> {
     boolean existsByChainAndRoundAndAuthorAndIsPlaceholderFalse(Chain chain, int round, Player author);
 
     boolean existsByChainOriginPlayerAndRoundAndIsPlaceholderFalse(Player originPlayer, int round);
+
+    void deleteAllByChainIn(Collection<Chain> chains);
+
+    long countByChainInAndRoundAndIsPlaceholderFalse(Collection<Chain> chains, int round);
 }

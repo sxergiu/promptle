@@ -10,13 +10,7 @@ export const routes: Routes = [
   { path: '', component: HomeComponent },
   { path: 'join/:roomCode', component: JoinComponent },
   { path: 'lobby/:roomCode', component: LobbyComponent, canActivate: [playerTokenGuard] },
-  {
-    path: 'game/:roomCode',
-    component: GameComponent,
-    canActivate: [playerTokenGuard],
-    children: [
-      { path: 'results', component: ResultsComponent, canActivate: [playerTokenGuard] },
-    ],
-  },
+  { path: 'game/:roomCode', component: GameComponent, canActivate: [playerTokenGuard] },
+  { path: 'game/:roomCode/results', component: ResultsComponent, canActivate: [playerTokenGuard] },
   { path: '**', redirectTo: '' }
 ];

@@ -22,4 +22,8 @@ export class RoomApiService {
   startGame(roomCode: string, token: string): Observable<void> {
     return this.http.post<void>(`/api/rooms/${roomCode}/start`, null, { params: { token } });
   }
+
+  resetGame(roomCode: string, token: string): Observable<void> {
+    return this.http.post<void>(`/api/rooms/${roomCode}/reset`, null, { params: { token } });
+  }
 }

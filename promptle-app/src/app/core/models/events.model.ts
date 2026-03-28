@@ -30,7 +30,7 @@ export interface GameStateSnapshot {
 }
 
 export interface RoomEvent {
-  type: 'PLAYER_JOINED' | 'PLAYER_LEFT' | 'HOST_CHANGED' | 'GAME_STARTED';
+  type: 'PLAYER_JOINED' | 'PLAYER_LEFT' | 'HOST_CHANGED' | 'GAME_STARTED' | 'GAME_RESET';
   players: PlayerDto[];
   hostId: string;
 }
