@@ -49,6 +49,7 @@ public class RoomMapper {
                 serverTimestamp,
                 imageUrl,
                 false,
+                0,
                 playerDtos,
                 hostId
         );
