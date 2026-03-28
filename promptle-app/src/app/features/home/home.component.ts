@@ -1,6 +1,9 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { RoomApiService } from '../../core/services/room-api.service';
 import { PlayerService } from '../../core/services/player.service';
 import { PlayerIcon, PLAYER_ICONS } from '../../core/models/player-icons';
@@ -8,7 +11,7 @@ import { PlayerIcon, PLAYER_ICONS } from '../../core/models/player-icons';
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MatButtonModule, MatFormFieldModule, MatInputModule],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',
 })
