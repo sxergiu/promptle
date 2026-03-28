@@ -25,6 +25,7 @@ export interface GameStateSnapshot {
   imageUrl: string | null;
   players: PlayerDto[];
   hasSubmitted: boolean;
+  submittedCount: number;
   hostId: string;
 }
 
@@ -53,8 +54,8 @@ export interface RoundReadyPayload {
 }
 
 export interface ChainEntryDto {
-  playerId: string;
-  avatarId: string;
+  playerId: string | null;
+  avatarId: string | null;
   text: string;
   imageUrl: string | null;
   isPlaceholder: boolean;
