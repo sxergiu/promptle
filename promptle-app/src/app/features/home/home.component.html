@@ -1,36 +1,38 @@
-<div class="home-container">
-  <header class="home-header">
+<div class="home-shell">
+  <header class="home-header page-header">
     <h1 class="logo">Promptle</h1>
     <p class="tagline">The AI Telephone</p>
   </header>
 
-  <main class="home-main">
-    <div class="avatar-section">
-      <img [src]="selectedIcon.path" [alt]="selectedIcon.id" class="avatar-img" />
-      <button type="button" mat-button class="shuffle-btn" (click)="shuffleIcon()" aria-label="Shuffle avatar">
-        &#x21BB; Shuffle
-      </button>
-    </div>
+  <main class="home-body">
+    <div class="home-main">
+      <div class="avatar-section">
+        <img [src]="selectedIcon.path" [alt]="selectedIcon.id" class="avatar-img" />
+        <button type="button" mat-button class="shuffle-btn" (click)="shuffleIcon()" aria-label="Shuffle avatar">
+          &#x21BB; Shuffle
+        </button>
+      </div>
 
-    <div class="form-section">
-      <mat-form-field appearance="outline">
-        <input matInput
-          type="text"
-          [value]="alias()"
-          (input)="alias.set($any($event.target).value)"
-          placeholder="Enter your name"
-          aria-label="Alias"
-        />
-      </mat-form-field>
-      <button
-        type="button"
-        mat-raised-button
-        class="create-room-btn"
-        [disabled]="!alias().trim()"
-        (click)="onCreateRoom()"
-      >
-        Create Room
-      </button>
+      <div class="form-section">
+        <mat-form-field appearance="outline">
+          <input matInput
+            type="text"
+            [value]="alias()"
+            (input)="alias.set($any($event.target).value)"
+            placeholder="Enter your name"
+            aria-label="Alias"
+          />
+        </mat-form-field>
+        <button
+          type="button"
+          mat-raised-button
+          class="create-room-btn"
+          [disabled]="!alias().trim()"
+          (click)="onCreateRoom()"
+        >
+          Create Room
+        </button>
+      </div>
     </div>
   </main>
 

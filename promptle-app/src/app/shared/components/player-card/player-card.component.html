@@ -2,12 +2,14 @@
   <img [src]="avatarPath" [alt]="alias" class="player-avatar" />
 
   <div class="player-info">
-    <span class="player-alias">{{ alias }}</span>
-    @if (isHost) {
-      <span class="crown" aria-label="Host crown">&#x1F451;</span>
-    }
+    <div class="player-name-row">
+      @if (isHost) {
+        <span class="crown" aria-label="Host">&#x1F451;</span>
+      }
+      <span class="player-alias">{{ alias }}</span>
+    </div>
     @if (isCurrentPlayer) {
-      <span class="me-label">me</span>
+      <span class="me-label">you</span>
     }
   </div>
 

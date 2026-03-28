@@ -1,0 +1,227 @@
+:host { display: flex; flex-direction: column; min-height: 100vh; }
+
+.results-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--color-surface);
+}
+
+/* ── Header ── */
+.results-header {
+  padding: 1.5rem 1.5rem 1.75rem;
+}
+
+.results-title {
+  font-size: 0.875rem;
+  font-weight: 900;
+  margin: 0;
+  letter-spacing: 0.04em;
+  position: relative;
+}
+
+.chain-indicator {
+  font-size: 0.6rem;
+  opacity: 0.85;
+  font-weight: 600;
+  position: relative;
+}
+
+/* ── Chain dots ── */
+.chain-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 1rem 1.5rem 0.5rem;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-border);
+  transition: background 0.35s, transform 0.35s, box-shadow 0.35s;
+}
+
+.dot.active {
+  background: var(--color-primary);
+  transform: scale(1.45);
+  box-shadow: 0 0 0 3px rgba(153, 0, 48, 0.2);
+  animation: dotBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.dot.done {
+  background: var(--p-green);
+  box-shadow: 0 0 6px rgba(98, 130, 102, 0.4);
+}
+
+.dot.clickable {
+  cursor: pointer;
+
+  &:hover {
+    transform: scale(1.6);
+    box-shadow: 0 0 0 3px rgba(98, 130, 102, 0.3);
+  }
+
+  &.active:hover {
+    box-shadow: 0 0 0 3px rgba(153, 0, 48, 0.3);
+  }
+}
+
+@keyframes dotBounce {
+  from { transform: scale(0.8); }
+  to   { transform: scale(1.45); }
+}
+
+/* ── Entries feed ── */
+.entries-feed {
+  flex: 1;
+  padding: 1.25rem 1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 680px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.entry-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  animation: entryReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  &:nth-child(odd) { padding-left: 0; }
+  &:nth-child(even) { padding-left: 1.5rem; }
+}
+
+@keyframes entryReveal {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.entry-bubble-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.entry-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--avatar-bg);
+  border: 2px solid var(--color-border);
+}
+
+.entry-avatar:not(.entry-avatar--app) {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(153, 0, 48, 0.15);
+  animation: avatarSettle 0.4s ease 5s forwards;
+}
+
+@keyframes avatarSettle {
+  to {
+    border-color: var(--p-green);
+    box-shadow: 0 0 0 2px rgba(98, 130, 102, 0.2);
+  }
+}
+
+.entry-content { flex: 1; }
+
+.entry-author {
+  font-size: 0.7rem;
+  font-weight: 700;
+  opacity: 0.65;
+  margin-bottom: 0.3rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.entry-bubble {
+  background: var(--bs-secondary-bg, var(--color-border));
+  border-radius: 0 14px 14px 14px;
+  padding: 0.85rem 1.1rem;
+  font-size: 0.65rem;
+  line-height: 1.8;
+  color: var(--color-on-surface);
+  word-break: break-word;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--color-border);
+}
+
+.entry-bubble.placeholder-bubble {
+  font-style: italic;
+  opacity: 0.5;
+}
+
+/* Right-aligned image row (sent by Promptle) */
+.entry-row--image {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.entry-bubble-wrap--right {
+  justify-content: flex-end;
+}
+
+.entry-content--right {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+}
+
+.entry-author--right {
+  text-align: right;
+  color: var(--p-green);
+}
+
+.entry-avatar--app {
+  border-color: var(--p-green);
+  box-shadow: 0 0 0 2px rgba(98, 130, 102, 0.2);
+  background: var(--color-surface);
+  object-fit: contain;
+  padding: 3px;
+}
+
+.entry-image-bubble {
+  border-radius: 14px 0 14px 14px;
+  overflow: hidden;
+  box-shadow: 4px 4px 0 var(--p-green);
+  border: 2px solid var(--p-green);
+  animation: imageFade 0.6s ease 0.15s both;
+  max-width: 360px;
+}
+
+@keyframes imageFade {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.entry-image {
+  width: 100%;
+  max-height: 360px;
+  object-fit: cover;
+  display: block;
+}
+
+/* ── Actions ── */
+.results-actions {
+  position: sticky;
+  bottom: 0;
+  background: var(--color-surface);
+  border-top: 2px solid var(--color-border);
+  padding: 1rem 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.results-actions .mat-mdc-raised-button {
+  overflow: hidden;
+  position: relative;
+}
