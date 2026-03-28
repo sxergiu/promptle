@@ -1,12 +1,13 @@
 import { Component } from '@angular/core';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 @Component({
   selector: 'app-generating',
   standalone: true,
-  imports: [],
+  imports: [MatProgressSpinnerModule],
   template: `
     <div>
-      <div role="progressbar" class="spinner"></div>
+      <mat-spinner></mat-spinner>
       <p>Generating...</p>
     </div>
   `,
