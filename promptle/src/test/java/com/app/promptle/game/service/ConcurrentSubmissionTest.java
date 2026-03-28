@@ -102,7 +102,7 @@ class ConcurrentSubmissionTest {
         // After the FIRST save (one submission), count = 1 out of 2 — not all submitted yet.
         // After the SECOND save (two submissions), count = 2 out of 2 — all submitted.
         AtomicInteger saveCount = new AtomicInteger(0);
-        when(chainEntryRepository.countByChainInAndRound(any(), anyInt()))
+        when(chainEntryRepository.countByChainInAndRoundAndIsPlaceholderFalse(any(), anyInt()))
                 .thenAnswer(inv -> (long) saveCount.incrementAndGet());
 
         CountDownLatch startLatch = new CountDownLatch(1);
@@ -182,7 +182,7 @@ class ConcurrentSubmissionTest {
 
         // After first save: 1 of 2; after second save: 2 of 2
         AtomicInteger saveCount = new AtomicInteger(0);
-        when(chainEntryRepository.countByChainInAndRound(any(), anyInt()))
+        when(chainEntryRepository.countByChainInAndRoundAndIsPlaceholderFalse(any(), anyInt()))
                 .thenAnswer(inv -> (long) saveCount.incrementAndGet());
 
         CountDownLatch startLatch = new CountDownLatch(1);
