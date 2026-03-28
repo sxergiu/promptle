@@ -5,12 +5,14 @@ import { of } from 'rxjs';
 import { ResultsComponent } from './results.component';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { PlayerService } from '../../core/services/player.service';
+import { RoomApiService } from '../../core/services/room-api.service';
 
 describe('ResultsComponent', () => {
   let component: ResultsComponent;
   let fixture: ComponentFixture<ResultsComponent>;
   let wsSpy: jasmine.SpyObj<WebSocketService>;
   let playerServiceSpy: jasmine.SpyObj<PlayerService>;
+  let roomApiSpy: jasmine.SpyObj<RoomApiService>;
   let routerSpy: jasmine.SpyObj<Router>;
 
   const ROOM_CODE = 'RESU1234';
@@ -38,9 +40,12 @@ describe('ResultsComponent', () => {
   beforeEach(async () => {
     wsCallbacks = {};
 
-    wsSpy = jasmine.createSpyObj('WebSocketService', ['connect', 'disconnect', 'subscribe', 'send']);
+    wsSpy = jasmine.createSpyObj('WebSocketService', ['connect', 'disconnect', 'subscribe', 'send', 'isConnected']);
+    wsSpy.isConnected.and.returnValue(false); // tests exercise the connect path
     playerServiceSpy = jasmine.createSpyObj('PlayerService', ['clearLocalStorage', 'loadFromLocalStorage']);
+    roomApiSpy = jasmine.createSpyObj('RoomApiService', ['resetGame']);
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    roomApiSpy.resetGame.and.returnValue(of(undefined as void));
 
     // Component reads window.history.state instead of getCurrentNavigation()
     history.replaceState({ chains: MOCK_CHAINS, hostId: 'other-player-id' }, '');
@@ -66,6 +71,7 @@ describe('ResultsComponent', () => {
       providers: [
         { provide: WebSocketService, useValue: wsSpy },
         { provide: PlayerService, useValue: playerServiceSpy },
+        { provide: RoomApiService, useValue: roomApiSpy },
         { provide: Router, useValue: routerSpy },
         {
           provide: ActivatedRoute,
@@ -239,22 +245,28 @@ describe('ResultsComponent', () => {
   });
 
   it('Next button is enabled for host after all entries revealed', () => {
-    component.chains.set(MOCK_CHAINS);
-    component.isHost.set(true);
-    component.currentChainIndex.set(0);
-    component.revealedEntryCount.set(MOCK_CHAINS[0].entries.length);
-    fixture.detectChanges();
+    jasmine.clock().install();
+    try {
+      component.chains.set(MOCK_CHAINS);
+      component.isHost.set(true);
+      component.currentChainIndex.set(0);
+      component.revealedEntryCount.set(MOCK_CHAINS[0].entries.length);
+      jasmine.clock().tick(600); // advance past canProceed delay
+      fixture.detectChanges();
 
-    const compiled = fixture.nativeElement as HTMLElement;
-    const buttons = Array.from(compiled.querySelectorAll('button'));
-    const nextBtn = buttons.find(b =>
-      b.textContent?.toLowerCase().includes('next')
-    ) as HTMLButtonElement | undefined;
+      const compiled = fixture.nativeElement as HTMLElement;
+      const buttons = Array.from(compiled.querySelectorAll('button'));
+      const nextBtn = buttons.find(b =>
+        b.textContent?.toLowerCase().includes('next')
+      ) as HTMLButtonElement | undefined;
 
-    if (nextBtn) {
-      expect(nextBtn.disabled).toBeFalse();
-    } else {
-      expect(component.allRevealed()).toBeTrue();
+      if (nextBtn) {
+        expect(nextBtn.disabled).toBeFalse();
+      } else {
+        expect(component.allRevealed()).toBeTrue();
+      }
+    } finally {
+      jasmine.clock().uninstall();
     }
   });
 
@@ -295,29 +307,26 @@ describe('ResultsComponent', () => {
 
   // ---- "Back to Lobby" action ----
 
-  it('clears localStorage when navigating back to lobby', () => {
+  it('calls resetGame API when navigating back to lobby', () => {
     component.onBackToLobby();
 
-    expect(playerServiceSpy.clearLocalStorage).toHaveBeenCalledWith(ROOM_CODE);
+    expect(roomApiSpy.resetGame).toHaveBeenCalledWith(ROOM_CODE, 'tok-results');
   });
 
-  it('navigates to /lobby/{roomCode} on back to lobby', () => {
-    playerServiceSpy.clearLocalStorage.and.stub();
-    routerSpy.navigate.and.stub();
-
-    component.onBackToLobby();
+  it('navigates to /lobby/{roomCode} when GAME_RESET event received', () => {
+    wsCallbacks[`/topic/room/${ROOM_CODE}`]({ type: 'GAME_RESET', players: [], hostId: '' });
+    fixture.detectChanges();
 
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/lobby', ROOM_CODE]);
   });
 
   // ---- "Export Thread" button ----
 
-  it('Export Thread button is present in the UI', () => {
+  it('Export icon button is present in the UI', () => {
     const compiled = fixture.nativeElement as HTMLElement;
-    const buttons = Array.from(compiled.querySelectorAll('button'));
-    const exportBtn = buttons.find(b =>
-      b.textContent?.toLowerCase().includes('export')
-    );
+    // Export is now a mat-icon-button; look for aria-label or mat-icon content
+    const exportBtn = compiled.querySelector('[aria-label="Export thread"]')
+      ?? compiled.querySelector('button mat-icon, button .material-icons');
     expect(exportBtn).toBeTruthy();
   });
 

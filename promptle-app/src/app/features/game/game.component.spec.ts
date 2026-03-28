@@ -180,7 +180,24 @@ describe('GameComponent', () => {
 
   // ---- PhaseChangedEvent handling ----
 
-  it('updates phase, round, timer signals from PhaseChangedEvent', () => {
+  it('updates phase, round, timer signals from PhaseChangedEvent (non-GUESSING)', () => {
+    wsCallbacks[`/topic/game/${ROOM_CODE}`]({
+      phase: GamePhase.GENERATING,
+      round: 1,
+      totalRounds: 4,
+      timerSeconds: 0,
+      serverTimestamp: 1700000001000,
+    });
+    fixture.detectChanges();
+
+    expect(component.phase()).toBe(GamePhase.GENERATING);
+    expect(component.currentRound()).toBe(1);
+    expect(component.timerSeconds()).toBe(0);
+    expect(component.serverTimestamp()).toBe(1700000001000);
+  });
+
+  it('buffers GUESSING phase until imageUrl arrives, then flushes', () => {
+    // Phase event arrives first — must NOT flip to GUESSING yet
     wsCallbacks[`/topic/game/${ROOM_CODE}`]({
       phase: GamePhase.GUESSING,
       round: 2,
@@ -189,11 +206,17 @@ describe('GameComponent', () => {
       serverTimestamp: 1700000001000,
     });
     fixture.detectChanges();
+    expect(component.phase()).not.toBe(GamePhase.GUESSING); // still buffered
+
+    // imageUrl payload arrives — should flush the buffered transition
+    wsCallbacks['/user/queue/game']({ round: 2, imageUrl: '/api/images/game/img1' });
+    fixture.detectChanges();
 
     expect(component.phase()).toBe(GamePhase.GUESSING);
     expect(component.currentRound()).toBe(2);
     expect(component.timerSeconds()).toBe(45);
     expect(component.serverTimestamp()).toBe(1700000001000);
+    expect(component.imageUrl()).toBe('/api/images/game/img1');
   });
 
   // ---- SubmissionUpdateEvent ----
