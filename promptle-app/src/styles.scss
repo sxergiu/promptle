@@ -5,10 +5,10 @@ html {
   @include mat.theme((
     color: (
       theme-type: light,
-      primary: mat.$azure-palette,
+      primary: mat.$red-palette,
       tertiary: mat.$rose-palette,
     ),
-    typography: Roboto,
+    typography: 'Press Start 2P',
     density: 0,
   ));
 }
@@ -29,12 +29,21 @@ html {
   --color-on-surface: #464646;
   --color-border: #b4b4b4;
 
+  // Avatar icon circle background — white in light mode
+  --avatar-bg: #ffffff;
+
   // Palette tokens
   --p-green: #628266;
   --p-red: #990030;
   --p-black: #000000;
   --p-gray-light: #b4b4b4;
   --p-gray-dark: #464646;
+
+  // Semantic status colors
+  --color-danger: #dc3545;
+  --color-danger-bg: rgba(220, 53, 69, 0.08);
+  --color-warning: #e08020;
+  --color-overlay-bg: rgba(20, 20, 20, 0.92);
 
   // Override Bootstrap semantic tokens to follow the palette
   --bs-primary: #990030;
@@ -75,13 +84,22 @@ html {
   --color-on-surface: #e0e0e0;
   --color-border: #464646;
 
+  // Avatar icon circle background — gray in dark mode
+  --avatar-bg: var(--color-border);
+
+  // Status colors — dark overrides
+  --color-danger: #f06070;
+  --color-danger-bg: rgba(240, 96, 112, 0.12);
+  --color-warning: #f09050;
+  --color-overlay-bg: rgba(10, 10, 10, 0.95);
+
   @include mat.theme((
     color: (
       theme-type: dark,
-      primary: mat.$azure-palette,
+      primary: mat.$red-palette,
       tertiary: mat.$rose-palette,
     ),
-    typography: Roboto,
+    typography: 'Press Start 2P',
     density: 0,
   ));
   --bs-primary: #cc3358;
@@ -131,6 +149,38 @@ html {
   --bs-btn-disabled-border-color: #b4b4b4;
 }
 
+// ── Material component color overrides ────────────────────────────────────────
+// Force all Material components to use brand theme colors instead of azure palette
+
+:root {
+  --mat-text-button-label-text-color: var(--color-primary);
+  --mat-text-button-state-layer-color: var(--color-primary);
+  --mat-outlined-button-label-text-color: var(--color-primary);
+  --mat-outlined-button-outline-color: var(--color-primary);
+  --mat-icon-button-icon-color: var(--color-primary);
+  --mat-icon-button-state-layer-color: var(--color-primary);
+}
+
+// Green button variant — apply class="btn-green" alongside mat-raised-button / mat-stroked-button
+.btn-green {
+  &.mat-mdc-raised-button {
+    --mdc-filled-button-container-color: var(--p-green);
+    --mdc-filled-button-label-text-color: #fff;
+    --mat-filled-button-state-layer-color: #fff;
+    background-color: var(--p-green) !important;
+    color: #fff !important;
+
+    .mdc-button__label { color: #fff !important; }
+  }
+  &.mat-mdc-outlined-button {
+    --mdc-outlined-button-label-text-color: var(--p-green);
+    --mdc-outlined-button-outline-color: var(--p-green);
+    --mat-outlined-button-state-layer-color: var(--p-green);
+    color: var(--p-green) !important;
+    border-color: var(--p-green) !important;
+  }
+}
+
 // ── CSS-only tooltips ─────────────────────────────────────────────────────────
 // Usage: add data-tooltip="Label" to any element
 
@@ -161,6 +211,140 @@ html {
   }
 }
 
+// ── Global layout ─────────────────────────────────────────────────────────────
+
+html {
+  font-size: 14px;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  font-family: 'Press Start 2P', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+body {
+  background: linear-gradient(160deg, var(--page-bg-start) 0%, var(--page-bg-mid) 50%, var(--page-bg-end) 100%);
+  background-attachment: fixed;
+  color: var(--color-on-surface);
+}
+
+app-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+// ── Global card utility ────────────────────────────────────────────────────────
+
+.card {
+  background: var(--color-surface);
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 var(--color-primary);
+  border: 2px solid var(--color-primary);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+// ── Shared page utilities ──────────────────────────────────────────────────────
+
+.page-center {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  box-sizing: border-box;
+}
+
+.page-card {
+  background: var(--color-surface);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  padding: 2.5rem 2rem;
+  width: 100%;
+}
+
+// ── Shared page header ────────────────────────────────────────────────────────
+// Apply to any page header for the green gradient + confetti style
+
+.page-header {
+  background: linear-gradient(135deg, var(--color-accent) 0%, #3d5340 100%);
+  color: var(--color-primary);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(circle, rgba(255,255,255,0.18) 1.5px, transparent 1.5px),
+      radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+    background-size: 32px 32px, 18px 18px;
+    background-position: 0 0, 9px 9px;
+    animation: confettiShift 8s linear infinite;
+  }
+}
+
+@keyframes confettiShift {
+  from { background-position: 0 0, 9px 9px; }
+  to   { background-position: 32px 32px, 41px 41px; }
+}
+
+// Pixel art avatar rendering
+img.player-avatar,
+img.avatar-img,
+img.entry-avatar {
+  image-rendering: pixelated;
+}
+
+// ── Smooth scrollbar ───────────────────────────────────────────────────────────
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+  &:hover {
+    background: var(--color-on-surface);
+    opacity: 0.4;
+  }
+}
+
+// ── Angular Material overrides ─────────────────────────────────────────────────
+
+.mat-mdc-form-field {
+  width: 100%;
+}
+
+.mdc-text-field--outlined .mdc-notched-outline__leading,
+.mdc-text-field--outlined .mdc-notched-outline__notch,
+.mdc-text-field--outlined .mdc-notched-outline__trailing {
+  border-color: var(--color-border) !important;
+}
+
+.mdc-text-field--focused .mdc-notched-outline__leading,
+.mdc-text-field--focused .mdc-notched-outline__notch,
+.mdc-text-field--focused .mdc-notched-outline__trailing {
+  border-color: var(--color-primary) !important;
+}
+
+// ── Theme toggle ───────────────────────────────────────────────────────────────
+
 .theme-toggle {
   position: fixed;
   bottom: 1.5rem;
@@ -178,7 +362,8 @@ html {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  padding: 0 0 4px;
+  line-height: 1;
 
   &:hover {
     background: var(--bs-secondary-bg);

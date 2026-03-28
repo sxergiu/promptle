@@ -6,22 +6,8 @@ import { WebSocketService } from '../../../core/services/websocket.service';
   selector: 'app-guessing',
   standalone: true,
   imports: [MatButtonModule],
-  template: `
-    <div>
-      <img [src]="imageUrl" alt="Generated image" />
-      <input
-        [readOnly]="submitted()"
-        [value]="guessText()"
-        (input)="guessText.set($any($event.target).value)"
-      />
-      <span>{{ submittedCount }} / {{ totalCount }} ready</span>
-      <button
-        mat-raised-button
-        [disabled]="submitted() || guessText().length === 0"
-        (click)="onSubmit()"
-      >Submit Guess</button>
-    </div>
-  `,
+  styleUrl: './guessing.component.scss',
+  templateUrl: './guessing.component.html',
 })
 export class GuessingPhaseComponent implements OnInit {
   @Input() roomCode: string = '';
@@ -42,7 +28,7 @@ export class GuessingPhaseComponent implements OnInit {
   }
 
   onSubmit(): void {
-    if (this.submitted() || this.guessText().length === 0) return;
+    if (this.submitted() || this.guessText().trim().length === 0) return;
     this.webSocketService.send(`/app/room/${this.roomCode}/guess`, { text: this.guessText() });
     this.submitted.set(true);
   }

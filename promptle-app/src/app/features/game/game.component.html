@@ -1,0 +1,44 @@
+
+    <div class="game-shell">
+      @if (phase() !== GamePhase.LOBBY) {
+        <header class="game-header page-header">
+          <div class="header-row">
+            <span class="round-badge">Round {{ currentRound() }} / {{ totalRounds() }}</span>
+            <span class="timer-display" [class.warning]="remainingSeconds() <= 10 && remainingSeconds() > 0">
+              {{ remainingSeconds() }}s
+            </span>
+          </div>
+          <div class="timer-track">
+            <div class="timer-fill"
+                 [class.warning]="remainingSeconds() <= 10 && remainingSeconds() > 0"
+                 [style.width.%]="timerPercent()">
+            </div>
+          </div>
+        </header>
+      }
+      <div class="game-phase">
+        @if (phase() === GamePhase.PROMPTING) {
+          <app-prompting
+            [roomCode]="roomCode"
+            [submittedCount]="submittedCount()"
+            [totalCount]="totalPlayerCount()"
+            [hasSubmitted]="hasSubmitted()"
+          ></app-prompting>
+        }
+        @if (phase() === GamePhase.GENERATING) {
+          <app-generating></app-generating>
+        }
+        @if (phase() === GamePhase.GUESSING) {
+          <app-guessing
+            [roomCode]="roomCode"
+            [imageUrl]="imageUrl() ?? ''"
+            [submittedCount]="submittedCount()"
+            [totalCount]="totalPlayerCount()"
+            [hasSubmitted]="hasSubmitted()"
+          ></app-guessing>
+        }
+      </div>
+      @if (!wsConnected()) {
+        <div class="reconnecting-overlay">⟳ Reconnecting…</div>
+      }
+    </div>

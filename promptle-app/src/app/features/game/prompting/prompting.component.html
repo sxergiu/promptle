@@ -1,0 +1,27 @@
+
+    <div class="phase-card">
+      <p class="phase-title">What should the AI create?</p>
+      <p class="phase-hint">Describe an image — the more creative the better.</p>
+      <textarea
+        class="prompt-textarea"
+        [readOnly]="submitted()"
+        [value]="promptText()"
+        (input)="promptText.set($any($event.target).value)"
+        placeholder="A cat riding a rocket to the moon…"
+      ></textarea>
+      <div class="card-footer">
+        <span class="counter">
+          @if (submitted()) {
+            <span class="submitted-label">✓ Submitted — waiting for others</span>
+          } @else {
+            <strong>{{ submittedCount }}</strong> / {{ totalCount }} ready
+          }
+        </span>
+        <button
+          mat-raised-button
+          color="primary"
+          [disabled]="submitted() || promptText().trim().length === 0"
+          (click)="onSubmit()"
+        >Ready</button>
+      </div>
+    </div>

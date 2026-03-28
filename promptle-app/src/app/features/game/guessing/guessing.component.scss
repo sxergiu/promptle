@@ -1,0 +1,143 @@
+.phase-card {
+  background: var(--color-surface);
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 var(--color-primary);
+  border: 2px solid var(--color-primary);
+  padding: 2rem;
+  width: 100%;
+  max-width: 560px;
+  animation: slideUp 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.phase-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0 0 0.375rem;
+  text-align: center;
+}
+
+.phase-hint {
+  font-size: 0.55rem;
+  color: var(--color-on-surface);
+  opacity: 0.55;
+  margin: 0 0 1.25rem;
+  text-align: center;
+  line-height: 1.8;
+}
+
+/* ── Image frame ── */
+.image-frame {
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+  aspect-ratio: 4/3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+
+  // Skeleton shimmer when no image yet
+  background: linear-gradient(
+    90deg,
+    var(--color-border) 25%,
+    rgba(180, 180, 180, 0.35) 37%,
+    var(--color-border) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+  box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+@keyframes shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.guess-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: imageFadeIn 0.5s ease;
+  transform-origin: center;
+}
+
+@keyframes imageFadeIn {
+  from { opacity: 0; transform: scale(1.03); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.image-loading {
+  font-size: 0.875rem;
+  color: var(--color-on-surface);
+  opacity: 0.4;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Guess input ── */
+.guess-input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  font-family: inherit;
+  border: 1.5px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+  display: block;
+
+  &:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(153, 0, 48, 0.1);
+  }
+}
+
+.guess-input[readonly] {
+  opacity: 0.6;
+  background: var(--color-border);
+  cursor: default;
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.25rem;
+  gap: 1rem;
+}
+
+.counter {
+  font-size: 0.55rem;
+  color: var(--color-on-surface);
+  opacity: 0.6;
+
+  strong {
+    color: var(--color-primary);
+    font-weight: 700;
+  }
+}
+
+.submitted-label {
+  font-size: 0.55rem;
+  color: var(--p-green);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  animation: submittedBounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes submittedBounceIn {
+  from { opacity: 0; transform: scale(0.75); }
+  to   { opacity: 1; transform: scale(1); }
+}
