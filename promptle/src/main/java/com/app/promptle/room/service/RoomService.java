@@ -7,6 +7,7 @@ import com.app.promptle.game.model.Chain;
 import com.app.promptle.game.model.ChainEntry;
 import com.app.promptle.game.model.GamePhase;
 import com.app.promptle.game.repository.ChainEntryRepository;
+import com.app.promptle.game.repository.ChainRepository;
 import com.app.promptle.game.service.RoundAssignmentService;
 import com.app.promptle.image.api.ImageStorageService;
 import com.app.promptle.room.dto.CreateRoomRequest;
@@ -59,6 +60,7 @@ public class RoomService {
     private final SimpMessagingTemplate messagingTemplate;
     private final RoundAssignmentService roundAssignmentService;
     private final ChainEntryRepository chainEntryRepository;
+    private final ChainRepository chainRepository;
     private final RoomMapper roomMapper;
 
     public RoomService(RoomRepository roomRepository,
@@ -68,6 +70,7 @@ public class RoomService {
                        SimpMessagingTemplate messagingTemplate,
                        RoundAssignmentService roundAssignmentService,
                        ChainEntryRepository chainEntryRepository,
+                       ChainRepository chainRepository,
                        RoomMapper roomMapper) {
         this.roomRepository = roomRepository;
         this.playerRepository = playerRepository;
@@ -76,6 +79,7 @@ public class RoomService {
         this.messagingTemplate = messagingTemplate;
         this.roundAssignmentService = roundAssignmentService;
         this.chainEntryRepository = chainEntryRepository;
+        this.chainRepository = chainRepository;
         this.roomMapper = roomMapper;
     }
 
@@ -112,8 +116,8 @@ public class RoomService {
             throw new GameException("Game already in progress");
         }
 
-        List<Player> connected = playerRepository.findByRoomAndConnectedTrue(room);
-        if (connected.size() >= MAX_PLAYERS) {
+        List<Player> allPlayers = playerRepository.findByRoom(room);
+        if (allPlayers.size() >= MAX_PLAYERS) {
             throw new GameException("Room is full");
         }
 
@@ -168,14 +172,21 @@ public class RoomService {
             serverTimestamp = 0L;
         }
 
-        List<Player> connectedPlayers = playerRepository.findByRoomAndConnectedTrue(room);
-        // Always include the requesting player even if not yet connected (WS handshake hasn't fired yet)
-        List<Player> snapshotPlayers = connectedPlayers.stream().anyMatch(p -> p.getId().equals(player.getId()))
-                ? connectedPlayers
-                : Stream.concat(connectedPlayers.stream(), Stream.of(player)).toList();
+        List<Player> snapshotPlayers;
+        if (phase == GamePhase.LOBBY) {
+            // In LOBBY, include all joined players (connected or not) so the lobby roster is complete
+            snapshotPlayers = playerRepository.findByRoom(room);
+        } else {
+            List<Player> connectedPlayers = playerRepository.findByRoomAndConnectedTrue(room);
+            // Always include the requesting player even if not yet connected (WS handshake hasn't fired yet)
+            snapshotPlayers = connectedPlayers.stream().anyMatch(p -> p.getId().equals(player.getId()))
+                    ? connectedPlayers
+                    : Stream.concat(connectedPlayers.stream(), Stream.of(player)).toList();
+        }
         GameStateSnapshot base = roomMapper.toSnapshot(room, snapshotPlayers, timerSeconds, serverTimestamp, imageUrl);
 
         boolean hasSubmitted = computeHasSubmitted(player, room);
+        int submittedCount = computeSubmittedCount(room);
 
         return new GameStateSnapshot(
                 base.phase(),
@@ -185,6 +196,7 @@ public class RoomService {
                 base.serverTimestamp(),
                 base.imageUrl(),
                 hasSubmitted,
+                submittedCount,
                 base.players(),
                 base.hostId()
         );
@@ -273,20 +285,34 @@ public class RoomService {
     }
 
     private boolean computeHasSubmitted(Player player, Room room) {
-        // hasSubmitted is true if a non-placeholder ChainEntry exists for this player in the current round
-        // This is fully resolved in later chunks when chain assignment is complete.
-        // For now, return false as the base case.
+        GamePhase phase = room.getPhase();
+        if (phase == GamePhase.PROMPTING) {
+            return chainEntryRepository.existsByChainOriginPlayerAndRoundAndIsPlaceholderFalse(player, room.getCurrentRound());
+        } else if (phase == GamePhase.GUESSING) {
+            Chain chain = roundAssignmentService.getAssignedChain(room, player, room.getCurrentRound());
+            return chainEntryRepository.existsByChainAndRoundAndAuthorAndIsPlaceholderFalse(chain, room.getCurrentRound(), player);
+        }
         return false;
     }
 
+    private int computeSubmittedCount(Room room) {
+        GamePhase phase = room.getPhase();
+        if (phase == GamePhase.PROMPTING || phase == GamePhase.GUESSING) {
+            List<Chain> chains = chainRepository.findByRoom(room);
+            return (int) chainEntryRepository.countByChainInAndRound(chains, room.getCurrentRound());
+        }
+        return 0;
+    }
+
     /**
-     * Builds a GameResultsEvent by assembling chain entries for each player.
-     * Stub implementation — fully realized in Chunk 12.
+     * Builds a GameResultsEvent by assembling chain entries for every chain in the room.
+     * Used when a player reconnects during RESULTS phase to re-send the results payload.
+     * Mirrors the assembly logic in GameService.endGuessingRound().
      */
-    private GameResultsEvent buildGameResultsEvent(Room room, List<Player> players) {
-        List<com.app.promptle.game.dto.ChainDto> chains = players.stream().map(p -> {
-            Chain assignedChain = roundAssignmentService.getAssignedChain(room, p, room.getCurrentRound());
-            List<ChainEntry> entries = chainEntryRepository.findByChainOrderByRoundAsc(assignedChain);
+    private GameResultsEvent buildGameResultsEvent(Room room, List<Player> connectedPlayers) {
+        List<Chain> chains = chainRepository.findByRoom(room);
+        List<com.app.promptle.game.dto.ChainDto> chainDtos = chains.stream().map(chain -> {
+            List<ChainEntry> entries = chainEntryRepository.findByChainOrderByRoundAsc(chain);
             List<com.app.promptle.game.dto.ChainEntryDto> entryDtos = entries.stream().map(e ->
                     new com.app.promptle.game.dto.ChainEntryDto(
                             e.getAuthor() != null ? e.getAuthor().getId().toString() : null,
@@ -298,6 +324,6 @@ public class RoomService {
             ).toList();
             return new com.app.promptle.game.dto.ChainDto(entryDtos);
         }).toList();
-        return new GameResultsEvent(chains);
+        return new GameResultsEvent(chainDtos);
     }
 }

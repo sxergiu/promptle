@@ -1,9 +1,11 @@
 import { Component, Input, OnInit, signal } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { WebSocketService } from '../../../core/services/websocket.service';
 
 @Component({
   selector: 'app-prompting',
   standalone: true,
-  imports: [],
+  imports: [MatButtonModule],
   template: `
     <div>
       <textarea
@@ -13,6 +15,7 @@ import { Component, Input, OnInit, signal } from '@angular/core';
       ></textarea>
       <span>{{ submittedCount }} / {{ totalCount }} ready</span>
       <button
+        mat-raised-button
         [disabled]="submitted() || promptText().length === 0"
         (click)="onSubmit()"
       >Ready</button>
@@ -28,6 +31,8 @@ export class PromptingPhaseComponent implements OnInit {
   promptText = signal<string>('');
   submitted = signal<boolean>(false);
 
+  constructor(private webSocketService: WebSocketService) {}
+
   ngOnInit(): void {
     if (this.hasSubmitted) {
       this.submitted.set(true);
@@ -35,6 +40,8 @@ export class PromptingPhaseComponent implements OnInit {
   }
 
   onSubmit(): void {
+    if (this.submitted() || this.promptText().length === 0) return;
+    this.webSocketService.send(`/app/room/${this.roomCode}/prompt`, { text: this.promptText() });
     this.submitted.set(true);
   }
 }
