@@ -1,0 +1,148 @@
+:host { display: flex; flex-direction: column; min-height: 100vh; }
+
+.game-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+.game-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 0.75rem 1.5rem 0;
+
+  // Inherit gradient + confetti from page-header utility class
+  // (applied via class binding in the template)
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  position: relative;
+}
+
+.round-badge {
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  opacity: 0.9;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+/* Timer number */
+.timer-display {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  min-width: 3.5rem;
+  text-align: right;
+  transition: color 0.3s;
+  font-variant-numeric: tabular-nums;
+  position: relative;
+}
+
+.timer-display.warning {
+  color: var(--color-danger);
+  animation: timerFlash 0.8s ease-in-out infinite;
+}
+
+// Scale tick animation for urgency (fires every second when ≤10s)
+.timer-display.warning .tick {
+  display: inline-block;
+  animation: timerScale 1s ease-in-out infinite;
+}
+
+@keyframes timerFlash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes timerScale {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+/* Timer bar — gradient fill */
+.timer-track {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 0 -1.5rem;
+  position: relative;
+}
+
+.timer-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--p-green) 0%, #a8c05e 50%, var(--color-primary) 100%);
+  background-size: 200% 100%;
+  background-position: 0% 0%;
+  border-radius: 3px;
+  transition: width 0.95s linear, background-position 0.95s linear;
+}
+
+.timer-fill.warning {
+  background: linear-gradient(90deg, var(--color-warning) 0%, var(--color-danger) 100%);
+  background-size: 100% 100%;
+}
+
+/* ── Phase area ── */
+.game-phase {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  animation: phaseFadeIn 0.35s ease;
+}
+
+@keyframes phaseFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Reconnecting toast ── */
+.reconnecting-overlay {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-overlay-bg);
+  color: #fff;
+  padding: 0.55rem 1.4rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  animation: fadeUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  &::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-danger);
+    animation: reconnectPulse 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes reconnectPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.75); }
+}
