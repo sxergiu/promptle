@@ -1,0 +1,166 @@
+.duplicate-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.duplicate-dialog {
+  background: var(--color-surface);
+  border-radius: 16px;
+  padding: 2rem;
+  text-align: center;
+  max-width: 360px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+
+  p { margin: 0 0 1.5rem; font-size: 1rem; }
+}
+
+/* ── Shell ── */
+.lobby-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ── */
+.lobby-header {
+  animation: slideDown 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.lobby-title {
+  font-size: 0.875rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--color-primary);
+  position: relative;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+
+.room-code-badge {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  background: rgba(153, 0, 48, 0.1);
+  border: 1.5px solid rgba(153, 0, 48, 0.4);
+  border-radius: 999px;
+  padding: 0.2rem 0.8rem;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
+  user-select: all;
+
+  &:hover {
+    background: rgba(153, 0, 48, 0.18);
+    box-shadow: 0 0 0 3px rgba(153, 0, 48, 0.15);
+  }
+
+  &:active {
+    transform: scale(0.97);
+    animation: copyPulse 0.35s ease;
+  }
+}
+
+@keyframes copyPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(153, 0, 48, 0.35); }
+  70%  { box-shadow: 0 0 0 10px rgba(153, 0, 48, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(153, 0, 48, 0); }
+}
+
+.settings-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-primary);
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  &:hover { opacity: 1; }
+}
+
+/* ── Body ── */
+.lobby-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 1rem;
+  box-sizing: border-box;
+  gap: 1.5rem;
+  text-align: center;
+}
+
+/* ── Waiting hint ── */
+.waiting-hint {
+  font-size: 0.875rem;
+  color: var(--color-on-surface);
+  opacity: 0.45;
+  margin: 0;
+  text-align: center;
+
+  &::after {
+    content: '';
+    display: inline-block;
+    animation: waitingDots 1.8s steps(4, end) infinite;
+    overflow: hidden;
+    width: 0;
+    vertical-align: bottom;
+  }
+}
+
+@keyframes waitingDots {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+  100% { content: ''; }
+}
+
+/* ── Player grid ── */
+.player-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.875rem;
+  justify-content: center;
+  width: 100%;
+  max-width: 640px;
+  animation: fadeUp 0.45s ease 0.1s both;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Actions ── */
+.lobby-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 280px;
+  animation: fadeUp 0.45s ease 0.2s both;
+
+  button { width: 100%; }
+}

@@ -1,0 +1,35 @@
+
+    <div class="phase-card">
+      <p class="phase-title">What was the prompt for this image?</p>
+      <p class="phase-hint">Describe what you think the original creator had in mind.</p>
+      <div class="image-frame">
+        @if (imageUrl) {
+          <img [src]="imageUrl" alt="Generated image" class="guess-image" />
+        } @else {
+          <span class="image-loading">Loading image…</span>
+        }
+      </div>
+      <input
+        class="guess-input"
+        type="text"
+        [readOnly]="submitted()"
+        [value]="guessText()"
+        (input)="guessText.set($any($event.target).value)"
+        placeholder="Your best guess…"
+      />
+      <div class="card-footer">
+        <span class="counter">
+          @if (submitted()) {
+            <span class="submitted-label">✓ Submitted — waiting for others</span>
+          } @else {
+            <strong>{{ submittedCount }}</strong> / {{ totalCount }} ready
+          }
+        </span>
+        <button
+          mat-raised-button
+          color="primary"
+          [disabled]="submitted() || guessText().trim().length === 0"
+          (click)="onSubmit()"
+        >Submit Guess</button>
+      </div>
+    </div>

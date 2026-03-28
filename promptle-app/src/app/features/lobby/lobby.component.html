@@ -1,0 +1,55 @@
+@if (duplicateSession()) {
+  <div class="duplicate-overlay">
+    <div class="duplicate-dialog">
+      <p>You already have this lobby open in another tab.</p>
+      <button type="button" mat-button (click)="exitLobby()">Go to Home</button>
+    </div>
+  </div>
+}
+
+<div class="lobby-shell">
+  <header class="lobby-header page-header">
+    <h1 class="lobby-title">Lobby</h1>
+    <div class="header-right">
+      <span class="room-code-badge">{{ roomCode }}</span>
+      <button class="settings-btn" type="button" mat-icon-button aria-label="Settings">
+        <mat-icon>settings</mat-icon>
+      </button>
+    </div>
+  </header>
+
+  <div class="lobby-body">
+    <p class="waiting-hint">{{ players().length }} / 8 players · waiting for host to start</p>
+
+    <div class="player-list">
+      @for (player of players(); track player.id) {
+        <app-player-card
+          [alias]="player.alias"
+          [avatarId]="player.avatarId"
+          [isHost]="player.id === hostId()"
+          [isCurrentPlayer]="player.id === playerId"
+        />
+      }
+    </div>
+
+    <div class="lobby-actions">
+      @if (isHost()) {
+        <button type="button" mat-raised-button class="btn-green" (click)="inviteOthers()">
+          Copy Invite Link
+        </button>
+      }
+
+      <button
+        type="button"
+        mat-raised-button
+        color="primary"
+        [disabled]="!isHost() || players().length < 2 || starting()"
+        (click)="startGame()"
+      >
+        {{ isHost() ? 'Start Game' : 'Waiting for host…' }}
+      </button>
+
+      <button type="button" mat-button (click)="exitLobby()">Leave Lobby</button>
+    </div>
+  </div>
+</div>

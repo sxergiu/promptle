@@ -1,0 +1,19 @@
+<div class="player-card">
+  <img [src]="avatarPath" [alt]="alias" class="player-avatar" />
+
+  <div class="player-info">
+    <div class="player-name-row">
+      @if (isHost) {
+        <span class="crown" aria-label="Host">&#x1F451;</span>
+      }
+      <span class="player-alias">{{ alias }}</span>
+    </div>
+    @if (isCurrentPlayer) {
+      <span class="me-label">you</span>
+    }
+  </div>
+
+  @if (showKickButton) {
+    <button type="button" class="kick-btn" aria-label="Kick player">Kick</button>
+  }
+</div>
