@@ -8,6 +8,7 @@ import com.app.promptle.game.model.ChainEntry;
 import com.app.promptle.game.model.GamePhase;
 import com.app.promptle.game.repository.ChainEntryRepository;
 import com.app.promptle.game.repository.ChainRepository;
+import com.app.promptle.game.repository.RoundAssignmentRepository;
 import com.app.promptle.game.service.RoundAssignmentService;
 import com.app.promptle.image.api.ImageStorageService;
 import com.app.promptle.room.dto.CreateRoomRequest;
@@ -59,6 +60,7 @@ public class RoomService {
     private final ImageStorageService imageStorageService;
     private final SimpMessagingTemplate messagingTemplate;
     private final RoundAssignmentService roundAssignmentService;
+    private final RoundAssignmentRepository roundAssignmentRepository;
     private final ChainEntryRepository chainEntryRepository;
     private final ChainRepository chainRepository;
     private final RoomMapper roomMapper;
@@ -69,6 +71,7 @@ public class RoomService {
                        ImageStorageService imageStorageService,
                        SimpMessagingTemplate messagingTemplate,
                        RoundAssignmentService roundAssignmentService,
+                       RoundAssignmentRepository roundAssignmentRepository,
                        ChainEntryRepository chainEntryRepository,
                        ChainRepository chainRepository,
                        RoomMapper roomMapper) {
@@ -78,6 +81,7 @@ public class RoomService {
         this.imageStorageService = imageStorageService;
         this.messagingTemplate = messagingTemplate;
         this.roundAssignmentService = roundAssignmentService;
+        this.roundAssignmentRepository = roundAssignmentRepository;
         this.chainEntryRepository = chainEntryRepository;
         this.chainRepository = chainRepository;
         this.roomMapper = roomMapper;
@@ -116,8 +120,7 @@ public class RoomService {
             throw new GameException("Game already in progress");
         }
 
-        List<Player> allPlayers = playerRepository.findByRoom(room);
-        if (allPlayers.size() >= MAX_PLAYERS) {
+        if (playerRepository.findByRoomAndConnectedTrue(room).size() >= MAX_PLAYERS) {
             throw new GameException("Room is full");
         }
 
@@ -234,8 +237,15 @@ public class RoomService {
         List<Player> connectedPlayers = playerRepository.findByRoomAndConnectedTrue(room);
         publishRoomEvent(roomCode, RoomEventType.PLAYER_LEFT, connectedPlayers, room.getHostId());
 
-        // Host reassignment
-        if (room.getHostId() != null && room.getHostId().equals(player.getId())) {
+        // Auto-reset when last player disconnects during a non-LOBBY phase
+        // so new players can always join a room without the host having to manually reset
+        if (connectedPlayers.isEmpty() && room.getPhase() != GamePhase.LOBBY) {
+            autoResetRoom(room);
+            return;
+        }
+
+        // Host reassignment — skip during RESULTS; brief disconnects during showcase must not transfer host
+        if (room.getPhase() != GamePhase.RESULTS && room.getHostId() != null && room.getHostId().equals(player.getId())) {
             List<Player> otherConnected = connectedPlayers.stream()
                     .filter(p -> !p.getId().equals(playerId))
                     .sorted(Comparator.comparing(Player::getJoinedAt))
@@ -248,14 +258,79 @@ public class RoomService {
                 publishRoomEvent(roomCode, RoomEventType.HOST_CHANGED, connectedPlayers, newHost.getId());
             }
         }
+    }
 
-        // Cleanup on all disconnected in RESULTS phase
-        if (room.getPhase() == GamePhase.RESULTS && connectedPlayers.isEmpty()) {
-            imageStorageService.deleteGame(room.getId().toString());
+    public void resetGame(String roomCode, String playerToken) {
+        UUID tokenUuid = UUID.fromString(playerToken);
+        playerRepository.findByToken(tokenUuid)
+                .orElseThrow(() -> new GameException("Player not found for token: " + playerToken));
+
+        Room room = roomRepository.findByRoomCode(roomCode)
+                .orElseThrow(() -> new GameException("Room not found: " + roomCode));
+
+        if (room.getPhase() == GamePhase.LOBBY) {
+            return; // already reset — idempotent
         }
+
+        // Collect image URLs before deleting chain data
+        List<Chain> chains = chainRepository.findByRoom(room);
+        List<String> imageUrls = chains.stream()
+                .flatMap(chain -> chainEntryRepository.findByChainOrderByRoundAsc(chain).stream())
+                .map(ChainEntry::getImageUrl)
+                .filter(url -> url != null)
+                .toList();
+
+        // Delete game data in dependency order
+        roundAssignmentRepository.deleteAllByRoom(room);
+        chainEntryRepository.deleteAllByChainIn(chains);
+        chainRepository.deleteAllByRoom(room);
+
+        // Delete stored images
+        imageStorageService.deleteImages(imageUrls);
+
+        // Remove ghost players (disconnected during lobby/game)
+        playerRepository.deleteAll(playerRepository.findByRoomAndConnectedFalse(room));
+
+        // Reset room to LOBBY
+        room.setPhase(GamePhase.LOBBY);
+        room.setCurrentRound(0);
+        room.setTotalRounds(0);
+        room.setRoundStartedAt(null);
+        roomRepository.save(room);
+
+        // Broadcast GAME_RESET so all clients navigate back to lobby
+        List<Player> connectedPlayers = playerRepository.findByRoomAndConnectedTrue(room);
+        publishRoomEvent(roomCode, RoomEventType.GAME_RESET, connectedPlayers, room.getHostId());
     }
 
     // ---- Private helpers ----
+
+    /**
+     * Silently resets a room to LOBBY when all players have disconnected mid-game.
+     * Deletes game data so new players can join with a clean slate.
+     * No GAME_RESET event is broadcast (no clients are connected to receive it).
+     */
+    private void autoResetRoom(Room room) {
+        List<Chain> chains = chainRepository.findByRoom(room);
+        List<String> imageUrls = chains.stream()
+                .flatMap(chain -> chainEntryRepository.findByChainOrderByRoundAsc(chain).stream())
+                .map(ChainEntry::getImageUrl)
+                .filter(url -> url != null)
+                .toList();
+
+        roundAssignmentRepository.deleteAllByRoom(room);
+        chainEntryRepository.deleteAllByChainIn(chains);
+        chainRepository.deleteAllByRoom(room);
+        imageStorageService.deleteImages(imageUrls);
+
+        playerRepository.deleteAll(playerRepository.findByRoomAndConnectedFalse(room));
+
+        room.setPhase(GamePhase.LOBBY);
+        room.setCurrentRound(0);
+        room.setTotalRounds(0);
+        room.setRoundStartedAt(null);
+        roomRepository.save(room);
+    }
 
     private String generateUniqueRoomCode() {
         for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {

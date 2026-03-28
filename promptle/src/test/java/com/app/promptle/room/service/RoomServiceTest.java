@@ -9,6 +9,7 @@ import com.app.promptle.game.model.GamePhase;
 import com.app.promptle.game.model.RoundAssignment;
 import com.app.promptle.game.repository.ChainEntryRepository;
 import com.app.promptle.game.repository.ChainRepository;
+import com.app.promptle.game.repository.RoundAssignmentRepository;
 import com.app.promptle.game.service.RoundAssignmentService;
 import com.app.promptle.image.api.ImageStorageService;
 import com.app.promptle.room.dto.JoinRoomRequest;
@@ -64,6 +65,9 @@ class RoomServiceTest {
     private RoundAssignmentService roundAssignmentService;
 
     @Mock
+    private RoundAssignmentRepository roundAssignmentRepository;
+
+    @Mock
     private ChainEntryRepository chainEntryRepository;
 
     @Mock
@@ -80,6 +84,7 @@ class RoomServiceTest {
                 imageStorageService,
                 messagingTemplate,
                 roundAssignmentService,
+                roundAssignmentRepository,
                 chainEntryRepository,
                 chainRepository,
                 new RoomMapper()
@@ -218,7 +223,7 @@ class RoomServiceTest {
         Room room = buildLobbyRoom("ABCD1234");
         when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
         List<Player> eightPlayers = buildConnectedPlayers(8, room);
-        when(playerRepository.findByRoom(room)).thenReturn(eightPlayers);
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(eightPlayers);
 
         assertThrows(GameException.class,
                 () -> roomService.joinRoom("ABCD1234", new JoinRoomRequest("Bob", "icon-2")));
@@ -642,49 +647,9 @@ class RoomServiceTest {
     }
 
     @Test
-    void playerDisconnected_ResultsPhase_AllDisconnected_CallsDeleteGame() {
+    void playerDisconnected_NeverCallsDeleteGame() {
         UUID roomId = UUID.randomUUID();
         Room room = buildRoomWithPhase("ABCD1234", GamePhase.RESULTS);
-        room.setId(roomId);
-
-        Player p1 = buildPlayer(room);
-        p1.setConnected(true);
-        Player p2 = buildPlayer(room);
-        p2.setConnected(false);
-
-        when(playerRepository.findById(p1.getId())).thenReturn(Optional.of(p1));
-        // After p1 is saved with connected=false, no connected players remain
-        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of());
-
-        roomService.playerDisconnected("ABCD1234", p1.getId());
-
-        verify(imageStorageService).deleteGame(roomId.toString());
-    }
-
-    @Test
-    void playerDisconnected_ResultsPhase_PlayersRemain_DoesNotCallDeleteGame() {
-        UUID roomId = UUID.randomUUID();
-        Room room = buildRoomWithPhase("ABCD1234", GamePhase.RESULTS);
-        room.setId(roomId);
-
-        Player p1 = buildPlayer(room);
-        p1.setConnected(true);
-        Player p2 = buildPlayer(room);
-        p2.setConnected(true);
-
-        when(playerRepository.findById(p1.getId())).thenReturn(Optional.of(p1));
-        // After p1 disconnects, p2 still remains connected
-        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(p2));
-
-        roomService.playerDisconnected("ABCD1234", p1.getId());
-
-        verify(imageStorageService, never()).deleteGame(anyString());
-    }
-
-    @Test
-    void playerDisconnected_OutsideResultsPhase_DoesNotCallDeleteGame() {
-        UUID roomId = UUID.randomUUID();
-        Room room = buildRoomWithPhase("ABCD1234", GamePhase.GUESSING);
         room.setId(roomId);
 
         Player p1 = buildPlayer(room);
@@ -696,6 +661,42 @@ class RoomServiceTest {
         roomService.playerDisconnected("ABCD1234", p1.getId());
 
         verify(imageStorageService, never()).deleteGame(anyString());
+    }
+
+    @Test
+    void resetGame_IdempotentWhenAlreadyLobby() {
+        Room room = buildLobbyRoom("ABCD1234");
+        Player player = buildPlayer(room);
+        when(playerRepository.findByToken(player.getToken())).thenReturn(Optional.of(player));
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+
+        roomService.resetGame("ABCD1234", player.getToken().toString());
+
+        verify(chainRepository, never()).findByRoom(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void resetGame_ResetsRoomToLobbyAndBroadcasts() {
+        Room room = buildRoomWithPhase("ABCD1234", GamePhase.RESULTS);
+        Player player = buildPlayer(room);
+        when(playerRepository.findByToken(player.getToken())).thenReturn(Optional.of(player));
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of());
+        when(playerRepository.findByRoomAndConnectedFalse(room)).thenReturn(List.of());
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(player));
+
+        roomService.resetGame("ABCD1234", player.getToken().toString());
+
+        assertEquals(GamePhase.LOBBY, room.getPhase());
+        assertEquals(0, room.getCurrentRound());
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher, atLeastOnce()).publishEvent(captor.capture());
+        boolean hasReset = captor.getAllValues().stream()
+                .filter(e -> e instanceof RoomApplicationEvent)
+                .map(e -> (RoomApplicationEvent) e)
+                .anyMatch(e -> e.payload() != null && "GAME_RESET".equals(e.payload().type().toString()));
+        assertTrue(hasReset);
     }
 
     // ---- Helpers ----
