@@ -318,7 +318,7 @@ class GameServiceTest {
         when(chainEntryRepository.save(any(ChainEntry.class))).thenAnswer(inv -> inv.getArgument(0));
         when(chainEntryRepository.findByChainAndRound(any(), anyInt())).thenReturn(Optional.empty());
         when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(player));
-        when(chainEntryRepository.countByChainInAndRound(any(), anyInt())).thenReturn(0L);
+        when(chainEntryRepository.countByChainInAndRoundAndIsPlaceholderFalse(any(), anyInt())).thenReturn(0L);
 
         gameService.submitPrompt("ABCD1234", playerId, "A beautiful sunset");
 
@@ -344,7 +344,7 @@ class GameServiceTest {
         when(chainRepository.findByRoomAndOriginPlayer(room, player)).thenReturn(Optional.of(chain));
         when(chainEntryRepository.save(any(ChainEntry.class))).thenAnswer(inv -> inv.getArgument(0));
         when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(player));
-        when(chainEntryRepository.countByChainInAndRound(any(), anyInt())).thenReturn(0L);
+        when(chainEntryRepository.countByChainInAndRoundAndIsPlaceholderFalse(any(), anyInt())).thenReturn(0L);
 
         gameService.submitPrompt("ABCD1234", playerId, "A prompt");
 
@@ -370,7 +370,7 @@ class GameServiceTest {
         when(chainEntryRepository.save(any(ChainEntry.class))).thenAnswer(inv -> inv.getArgument(0));
         when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(player));
         // After save, 1 submitted out of 1
-        when(chainEntryRepository.countByChainInAndRound(any(), anyInt())).thenReturn(1L);
+        when(chainEntryRepository.countByChainInAndRoundAndIsPlaceholderFalse(any(), anyInt())).thenReturn(1L);
         when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
         when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
         when(imageGenerationService.generateImage(anyString()))
@@ -397,7 +397,7 @@ class GameServiceTest {
         when(chainEntryRepository.save(any(ChainEntry.class))).thenAnswer(inv -> inv.getArgument(0));
         when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(player, other));
         // 1 out of 2 submitted
-        when(chainEntryRepository.countByChainInAndRound(any(), anyInt())).thenReturn(1L);
+        when(chainEntryRepository.countByChainInAndRoundAndIsPlaceholderFalse(any(), anyInt())).thenReturn(1L);
         when(chainRepository.findByRoom(room)).thenReturn(List.of(chain, buildChain(other, room)));
 
         gameService.submitPrompt("ABCD1234", playerId, "A prompt");
@@ -437,7 +437,7 @@ class GameServiceTest {
         when(chainEntryRepository.save(any(ChainEntry.class))).thenAnswer(inv -> inv.getArgument(0));
         when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(player));
         when(chainRepository.findByRoom(room)).thenReturn(List.of(assignedChain));
-        when(chainEntryRepository.countByChainInAndRound(any(), anyInt())).thenReturn(0L);
+        when(chainEntryRepository.countByChainInAndRoundAndIsPlaceholderFalse(any(), anyInt())).thenReturn(0L);
 
         gameService.submitGuess("ABCD1234", playerId, "a guess");
 
@@ -462,7 +462,7 @@ class GameServiceTest {
         when(chainEntryRepository.save(any(ChainEntry.class))).thenAnswer(inv -> inv.getArgument(0));
         when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(player));
         when(chainRepository.findByRoom(room)).thenReturn(List.of(assignedChain));
-        when(chainEntryRepository.countByChainInAndRound(any(), anyInt())).thenReturn(0L);
+        when(chainEntryRepository.countByChainInAndRoundAndIsPlaceholderFalse(any(), anyInt())).thenReturn(0L);
 
         gameService.submitGuess("ABCD1234", playerId, "my guess");
 
@@ -552,7 +552,8 @@ class GameServiceTest {
         assertFalse(placeholders.isEmpty(), "Expected at least one placeholder entry");
         ChainEntry placeholder = placeholders.get(0);
         assertEquals("Wise Hipiotic Cow", placeholder.getText());
-        assertNull(placeholder.getAuthor());
+        assertNotNull(placeholder.getAuthor(), "Placeholder author should be set to the skipping player");
+        assertEquals(player, placeholder.getAuthor());
         assertTrue(placeholder.isPlaceholder());
     }
 
@@ -586,7 +587,7 @@ class GameServiceTest {
     }
 
     @Test
-    void insertPlaceholders_AuthorIsNull_OnPlaceholder() {
+    void insertPlaceholders_AuthorIsSkippingPlayer_OnPlaceholder() {
         Room room = buildRoom("ABCD1234", GamePhase.PROMPTING);
         room.setCurrentRound(1);
         UUID playerId = UUID.randomUUID();
@@ -609,7 +610,10 @@ class GameServiceTest {
 
         captor.getAllValues().stream()
                 .filter(ChainEntry::isPlaceholder)
-                .forEach(p -> assertNull(p.getAuthor()));
+                .forEach(p -> {
+                    assertNotNull(p.getAuthor(), "Placeholder author should be set to the skipping player");
+                    assertEquals(player, p.getAuthor());
+                });
     }
 
     // ---- endPromptingRound ----
@@ -986,7 +990,7 @@ class GameServiceTest {
         when(chainEntryRepository.save(any(ChainEntry.class))).thenAnswer(inv -> inv.getArgument(0));
         when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(player));
         // First call: 0 submitted (before save)
-        when(chainEntryRepository.countByChainInAndRound(any(), anyInt())).thenReturn(0L);
+        when(chainEntryRepository.countByChainInAndRoundAndIsPlaceholderFalse(any(), anyInt())).thenReturn(0L);
         when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
 
         // Idempotency: after the first save, the entry exists — second call should exit early.
@@ -1030,7 +1034,7 @@ class GameServiceTest {
         when(chainEntryRepository.save(any(ChainEntry.class))).thenAnswer(inv -> inv.getArgument(0));
         when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(player));
         when(chainRepository.findByRoom(room)).thenReturn(List.of(assignedChain));
-        when(chainEntryRepository.countByChainInAndRound(any(), anyInt())).thenReturn(0L);
+        when(chainEntryRepository.countByChainInAndRoundAndIsPlaceholderFalse(any(), anyInt())).thenReturn(0L);
 
         // Idempotency guard: second call is rejected
         when(chainEntryRepository.existsByChainAndRoundAndAuthorAndIsPlaceholderFalse(assignedChain, 2, player))

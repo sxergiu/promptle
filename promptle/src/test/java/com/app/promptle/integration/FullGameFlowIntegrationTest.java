@@ -218,8 +218,8 @@ class FullGameFlowIntegrationTest {
         assertTrue(p2Entries.stream().anyMatch(e ->
                 e.isPlaceholder() &&
                         "Wise Hipiotic Cow".equals(e.getText()) &&
-                        e.getAuthor() == null
-        ), "Player 2 should have a placeholder entry");
+                        p2.getId().equals(e.getAuthor().getId())
+        ), "Player 2 should have a placeholder entry attributed to player 2");
     }
 
     // ---- Scenario C — Mid-game disconnect ----
@@ -291,8 +291,10 @@ class FullGameFlowIntegrationTest {
     void scenarioE_MaxPlayerCountEnforcement_9thJoinFails() {
         String roomCode = createRoomAndGetCode("Host", "icon-1");
         Room room = roomRepository.findByRoomCode(roomCode).orElseThrow();
+        Player host = playerRepository.findById(room.getHostId()).orElseThrow();
+        connectPlayer(roomCode, host.getToken().toString());
 
-        // Join 7 more (total 8 including host)
+        // Join 7 more (total 8 including host) and connect each
         for (int i = 2; i <= 8; i++) {
             connectPlayer(roomCode, joinPlayer(roomCode, "Player" + i, "icon-" + i));
         }
