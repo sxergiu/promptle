@@ -1,6 +1,9 @@
 import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 
 import { RoomApiService } from '../../core/services/room-api.service';
 import { WebSocketService } from '../../core/services/websocket.service';
@@ -14,7 +17,7 @@ const DUPLICATE_TAB_TIMEOUT_MS = 50;
 @Component({
   selector: 'app-lobby',
   standalone: true,
-  imports: [CommonModule, PlayerCardComponent],
+  imports: [CommonModule, PlayerCardComponent, MatButtonModule, MatIconModule],
   templateUrl: './lobby.component.html',
   styleUrl: './lobby.component.scss',
 })
@@ -108,8 +111,14 @@ export class LobbyComponent implements OnInit, OnDestroy {
     navigator.clipboard.writeText(`${window.location.origin}/join/${this.roomCode}`);
   }
 
+  starting = signal(false);
+
   startGame(): void {
-    this.roomApiService.startGame(this.roomCode, this.playerToken).subscribe();
+    if (this.starting()) return;
+    this.starting.set(true);
+    this.roomApiService.startGame(this.roomCode, this.playerToken).subscribe({
+      error: (err: HttpErrorResponse) => { if (err.status !== 409) this.starting.set(false); },
+    });
   }
 
   exitLobby(): void {
