@@ -1,4 +1,17 @@
 @use 'bootstrap/scss/bootstrap';
+@use '@angular/material' as mat;
+
+html {
+  @include mat.theme((
+    color: (
+      theme-type: light,
+      primary: mat.$azure-palette,
+      tertiary: mat.$rose-palette,
+    ),
+    typography: Roboto,
+    density: 0,
+  ));
+}
 
 // ── Brand palette ─────────────────────────────────────────────────────────────
 // #628266  sage green   — confirm / join / positive actions
@@ -9,6 +22,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 :root {
+  // Semantic bridge — consumed by both Bootstrap and Angular Material overrides
+  --color-primary: #990030;
+  --color-accent: #628266;
+  --color-surface: #ffffff;
+  --color-on-surface: #464646;
+  --color-border: #b4b4b4;
+
   // Palette tokens
   --p-green: #628266;
   --p-red: #990030;
@@ -48,7 +68,22 @@
   --icon-filter-accent: brightness(0) saturate(100%) invert(12%) sepia(78%) saturate(3500%) hue-rotate(329deg) brightness(78%) contrast(123%);
 }
 
-[data-bs-theme='dark'] {
+[data-theme='dark'] {
+  // Semantic bridge — dark overrides
+  --color-primary: #cc3358;
+  --color-surface: #1e1e1e;
+  --color-on-surface: #e0e0e0;
+  --color-border: #464646;
+
+  @include mat.theme((
+    color: (
+      theme-type: dark,
+      primary: mat.$azure-palette,
+      tertiary: mat.$rose-palette,
+    ),
+    typography: Roboto,
+    density: 0,
+  ));
   --bs-primary: #cc3358;
   --bs-primary-rgb: 204, 51, 88;
   --bs-link-color: #cc3358;
