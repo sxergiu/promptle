@@ -7,20 +7,22 @@
   <main class="join-main">
     <div class="avatar-section">
       <img [src]="selectedIcon.path" [alt]="selectedIcon.id" class="avatar-img" />
-      <button type="button" class="shuffle-btn" (click)="shuffleIcon()" aria-label="Shuffle avatar">
+      <button type="button" mat-button class="shuffle-btn" (click)="shuffleIcon()" aria-label="Shuffle avatar">
         &#x21BB; Shuffle
       </button>
     </div>
 
     <div class="form-section">
-      <input
-        type="text"
-        [value]="alias()"
-        (input)="alias.set($any($event.target).value)"
-        placeholder="Enter your name"
-        class="alias-input"
-        aria-label="Alias"
-      />
+      <mat-form-field appearance="outline">
+        <input
+          matInput
+          type="text"
+          [value]="alias()"
+          (input)="alias.set($any($event.target).value)"
+          placeholder="Enter your name"
+          aria-label="Alias"
+        />
+      </mat-form-field>
 
       @if (errorMessage) {
         <div class="error-message">{{ errorMessage }}</div>
@@ -28,6 +30,7 @@
 
       <button
         type="button"
+        mat-raised-button
         class="join-room-btn"
         [disabled]="!alias().trim()"
         (click)="onJoinRoom()"
