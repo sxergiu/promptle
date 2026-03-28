@@ -18,7 +18,11 @@ export class WebSocketService {
   }
 
   disconnect(): void {
-    this.client.deactivate();
+    this.client?.deactivate();
+  }
+
+  isConnected(): boolean {
+    return !!this.client?.connected;
   }
 
   subscribe(destination: string, callback: (body: unknown) => void): StompSubscription {

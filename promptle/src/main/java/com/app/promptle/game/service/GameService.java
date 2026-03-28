@@ -77,6 +77,9 @@ public class GameService {
             throw new GameException("Not the host");
         }
 
+        // Reset showcase counter so repeated games in the same room start fresh
+        showcaseCounters.remove(roomCode);
+
         List<Player> connected = playerRepository.findByRoomAndConnectedTrue(room);
 
         if (connected.size() < 2 || connected.size() > 8) {
@@ -218,7 +221,7 @@ public class GameService {
         timerService.startRoundTimer(roomCode, newRound, guessingSeconds);
         eventPublisher.publishEvent(new PhaseChangedApplicationEvent(
                 roomCode, GamePhase.GUESSING, newRound, room.getTotalRounds(), guessingSeconds, now.toEpochMilli()));
-        eventPublisher.publishEvent(new RoundReadyApplicationEvent(roomCode, playerImageUrls));
+        eventPublisher.publishEvent(new RoundReadyApplicationEvent(roomCode, newRound, playerImageUrls));
     }
 
     @Transactional
@@ -240,7 +243,7 @@ public class GameService {
                 ChainEntry placeholder = new ChainEntry();
                 placeholder.setChain(chain);
                 placeholder.setRound(room.getCurrentRound());
-                placeholder.setAuthor(null);
+                placeholder.setAuthor(player);
                 placeholder.setText("Wise Hipiotic Cow");
                 placeholder.setPlaceholder(true);
                 return chainEntryRepository.save(placeholder);
@@ -332,7 +335,7 @@ public class GameService {
 
     private int countSubmittedForCurrentRound(Room room) {
         List<Chain> chains = chainRepository.findByRoom(room);
-        return (int) chainEntryRepository.countByChainInAndRound(chains, room.getCurrentRound());
+        return (int) chainEntryRepository.countByChainInAndRoundAndIsPlaceholderFalse(chains, room.getCurrentRound());
     }
 
     private Room getRoom(String roomCode) {

@@ -52,7 +52,7 @@ public class GameWebSocketBroadcaster {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onRoundReady(RoundReadyApplicationEvent event) {
         for (Map.Entry<UUID, String> entry : event.playerImageUrls().entrySet()) {
-            RoundReadyPayload payload = new RoundReadyPayload(0, entry.getValue());
+            RoundReadyPayload payload = new RoundReadyPayload(event.round(), entry.getValue());
             messagingTemplate.convertAndSendToUser(
                     entry.getKey().toString(),
                     "/queue/game",

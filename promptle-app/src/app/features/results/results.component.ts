@@ -1,56 +1,43 @@
-import { Component, OnDestroy, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal, computed, inject, effect } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { PlayerService } from '../../core/services/player.service';
-import { ChainDto, ShowcaseAdvancedEvent } from '../../core/models/events.model';
+import { RoomApiService } from '../../core/services/room-api.service';
+import { ChainDto, RoomEvent, ShowcaseAdvancedEvent } from '../../core/models/events.model';
+import { PlayerDto } from '../../core/models/player.model';
+import { PLAYER_ICONS } from '../../core/models/player-icons';
 import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-results',
   standalone: true,
-  imports: [MatButtonModule],
-  template: `
-    <div>
-      @for (chain of chains(); track $index) {
-        @if ($index === currentChainIndex()) {
-          @for (entry of chain.entries; track $index; let i = $index) {
-            @if (i < revealedEntryCount()) {
-              <div>
-                <span>{{ entry.text }}</span>
-                @if (entry.imageUrl) {
-                  <img [src]="entry.imageUrl" alt="entry image" />
-                }
-              </div>
-            }
-          }
-        }
-      }
-      <button
-        mat-raised-button
-        [disabled]="!isHost() || !allRevealed()"
-        (click)="currentChainIndex() < chains().length - 1 ? onNextChain() : onBackToLobby()"
-      >
-        {{ currentChainIndex() < chains().length - 1 ? 'Next' : 'Back to Lobby' }}
-      </button>
-      <button mat-button (click)="onExportThread()">Export Thread</button>
-    </div>
-  `,
+  imports: [MatButtonModule, MatIconModule],
+  styleUrl: './results.component.scss',
+  templateUrl: './results.component.html',
 })
 export class ResultsComponent implements OnInit, OnDestroy {
   private readonly webSocketService = inject(WebSocketService);
   private readonly playerService = inject(PlayerService);
+  private readonly roomApiService = inject(RoomApiService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
   chains = signal<ChainDto[]>([]);
+  players = signal<PlayerDto[]>([]);
   currentChainIndex = signal<number>(0);
   revealedEntryCount = signal<number>(0);
   isHost = signal<boolean>(false);
+  canProceed = signal<boolean>(false);
+
+  private readonly _allChainsCompleted = signal<boolean>(false);
+  readonly allChainsCompleted = this._allChainsCompleted.asReadonly();
 
   readonly revealIntervalMs: number = environment.showcaseRevealIntervalMs;
 
   private _intervalId: any = null;
+  private _proceedTimer: any = null;
   private _roomCode = '';
 
   readonly allRevealed = computed(() => {
@@ -59,15 +46,29 @@ export class ResultsComponent implements OnInit, OnDestroy {
     return this.revealedEntryCount() >= chain.entries.length;
   });
 
+  constructor() {
+    effect(() => {
+      if (this.allRevealed()) {
+        this._proceedTimer = setTimeout(() => this.canProceed.set(true), 550);
+        if (this.chains().length > 0 && this.currentChainIndex() >= this.chains().length - 1) {
+          this._allChainsCompleted.set(true);
+        }
+      } else {
+        if (this._proceedTimer) { clearTimeout(this._proceedTimer); this._proceedTimer = null; }
+        this.canProceed.set(false);
+      }
+    });
+  }
+
   ngOnInit(): void {
     this._roomCode = this.route.snapshot.paramMap.get('roomCode') ?? '';
 
-    // Read chains from navigation state (passed by game shell).
-    // window.history.state is used because getCurrentNavigation() returns null
-    // in ngOnInit — navigation has already completed by the time the component initializes.
-    const navState = window.history.state as { chains?: ChainDto[]; hostId?: string };
+    const navState = window.history.state as { chains?: ChainDto[]; hostId?: string; players?: PlayerDto[] };
     if (navState?.chains?.length) {
       this.chains.set(navState.chains);
+    }
+    if (navState?.players?.length) {
+      this.players.set(navState.players);
     }
 
     const stateHostId = navState?.hostId;
@@ -77,18 +78,42 @@ export class ResultsComponent implements OnInit, OnDestroy {
       this.isHost.set(true);
     }
 
-    this.webSocketService.connect(token, this._roomCode, () => {
+    const subscribeToTopics = () => {
       this.webSocketService.subscribe(`/topic/game/${this._roomCode}`, (msg: unknown) => {
         const event = msg as ShowcaseAdvancedEvent;
         if (event && typeof event.chainIndex === 'number') {
+          this.canProceed.set(false);
           this.currentChainIndex.set(event.chainIndex);
           this.revealedEntryCount.set(0);
           this.startRevealInterval();
         }
       });
-    });
+
+      this.webSocketService.subscribe(`/topic/room/${this._roomCode}`, (msg: unknown) => {
+        const event = msg as RoomEvent;
+        if (event?.type === 'GAME_RESET') {
+          this.router.navigate(['/lobby', this._roomCode]);
+        }
+      });
+    };
+
+    // Reuse the live connection kept by GameComponent; only reconnect on direct navigation / refresh
+    if (this.webSocketService.isConnected()) {
+      subscribeToTopics();
+    } else {
+      this.webSocketService.connect(token, this._roomCode, subscribeToTopics);
+    }
 
     this.startRevealInterval();
+  }
+
+  getPlayerName(playerId: string | null): string {
+    if (!playerId) return '';
+    return this.players().find(p => p.id === playerId)?.alias ?? '';
+  }
+
+  getAvatarPath(avatarId: string): string {
+    return PLAYER_ICONS.find(i => i.id === avatarId)?.path ?? '';
   }
 
   startRevealInterval(): void {
@@ -101,19 +126,32 @@ export class ResultsComponent implements OnInit, OnDestroy {
     }, this.revealIntervalMs);
   }
 
+  navigateToChain(index: number): void {
+    const canNavigate = index < this.currentChainIndex() || this.allChainsCompleted();
+    if (!canNavigate) return;
+    this._clearInterval();
+    this.currentChainIndex.set(index);
+    this.revealedEntryCount.set(this.chains()[index]?.entries.length ?? 0);
+    this.canProceed.set(true);
+  }
+
   onNextChain(): void {
     this.webSocketService.send(`/app/room/${this._roomCode}/next-chain`, {});
   }
 
   onBackToLobby(): void {
-    this.playerService.clearLocalStorage(this._roomCode);
-    this.router.navigate(['/lobby', this._roomCode]);
+    const token = this.playerService.loadFromLocalStorage(this._roomCode)?.playerToken ?? '';
+    this.roomApiService.resetGame(this._roomCode, token).subscribe({
+      error: () => this.router.navigate(['/lobby', this._roomCode])
+    });
   }
 
   onExportThread(): void {}
 
   ngOnDestroy(): void {
     this._clearInterval();
+    if (this._proceedTimer) clearTimeout(this._proceedTimer);
+    this.webSocketService.disconnect();
   }
 
   private _clearInterval(): void {
