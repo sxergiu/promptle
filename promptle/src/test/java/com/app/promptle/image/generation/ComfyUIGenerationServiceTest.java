@@ -4,12 +4,8 @@ import com.app.promptle.image.api.ImageStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
@@ -31,11 +27,16 @@ class ComfyUIGenerationServiceTest {
 
     private ComfyUIGenerationService service;
 
-    private static final String COMFY_URL = "http://localhost:8000";
+    private static final String COMFY_URL = "http://localhost:8188";
+    private static final String WORKFLOW_TEMPLATE = """
+            {"6":{"class_type":"CLIPTextEncode","inputs":{"text":"PROMPT_PLACEHOLDER","clip":["4",1]}},
+             "9":{"class_type":"SaveImage","inputs":{"images":["8",0],"filename_prefix":"ComfyUI"}},
+             "3":{"class_type":"KSampler","inputs":{"seed":0,"steps":1}}}""";
 
     @BeforeEach
     void setUp() {
-        service = new ComfyUIGenerationService(imageStorageService, COMFY_URL, restTemplate);
+        service = new ComfyUIGenerationService(imageStorageService, COMFY_URL, restTemplate,
+                WORKFLOW_TEMPLATE, "6", "9");
     }
 
     @Test
