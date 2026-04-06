@@ -3,6 +3,8 @@ package com.app.promptle.game.broadcast;
 import com.app.promptle.game.dto.*;
 import com.app.promptle.game.event.*;
 import com.app.promptle.room.event.RoomApplicationEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -18,6 +20,7 @@ import java.util.UUID;
 @Component
 public class GameWebSocketBroadcaster {
 
+    private static final Logger log = LoggerFactory.getLogger(GameWebSocketBroadcaster.class);
     private final SimpMessagingTemplate messagingTemplate;
 
     public GameWebSocketBroadcaster(SimpMessagingTemplate messagingTemplate) {
@@ -51,7 +54,10 @@ public class GameWebSocketBroadcaster {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onRoundReady(RoundReadyApplicationEvent event) {
+        log.info("onRoundReady: sending RoundReadyPayload to {} players for round {}",
+                event.playerImageUrls().size(), event.round());
         for (Map.Entry<UUID, String> entry : event.playerImageUrls().entrySet()) {
+            log.info("onRoundReady: sending to player {} imageUrl={}", entry.getKey(), entry.getValue());
             RoundReadyPayload payload = new RoundReadyPayload(event.round(), entry.getValue());
             messagingTemplate.convertAndSendToUser(
                     entry.getKey().toString(),
