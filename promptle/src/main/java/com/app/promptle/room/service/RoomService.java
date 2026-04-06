@@ -124,6 +124,12 @@ public class RoomService {
             throw new GameException("Room is full");
         }
 
+        // Clean up ghost players — disconnected during LOBBY means they left and aren't coming back.
+        // Skip the host (they might reconnect via stored token).
+        playerRepository.findByRoomAndConnectedFalse(room).stream()
+                .filter(p -> !p.getId().equals(room.getHostId()))
+                .forEach(playerRepository::delete);
+
         Player player = new Player();
         player.setAlias(request.alias());
         player.setAvatarId(request.avatarId());
@@ -177,8 +183,12 @@ public class RoomService {
 
         List<Player> snapshotPlayers;
         if (phase == GamePhase.LOBBY) {
-            // In LOBBY, include all joined players (connected or not) so the lobby roster is complete
-            snapshotPlayers = playerRepository.findByRoom(room);
+            // In LOBBY, only show connected players — disconnected players are ghosts who left.
+            // Always include the requesting player even if WS handshake hasn't completed yet.
+            List<Player> connectedInLobby = playerRepository.findByRoomAndConnectedTrue(room);
+            snapshotPlayers = connectedInLobby.stream().anyMatch(p -> p.getId().equals(player.getId()))
+                    ? connectedInLobby
+                    : Stream.concat(connectedInLobby.stream(), Stream.of(player)).toList();
         } else {
             List<Player> connectedPlayers = playerRepository.findByRoomAndConnectedTrue(room);
             // Always include the requesting player even if not yet connected (WS handshake hasn't fired yet)

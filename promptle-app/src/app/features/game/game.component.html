@@ -29,13 +29,15 @@
           <app-generating></app-generating>
         }
         @if (phase() === GamePhase.GUESSING) {
-          <app-guessing
-            [roomCode]="roomCode"
-            [imageUrl]="imageUrl() ?? ''"
-            [submittedCount]="submittedCount()"
-            [totalCount]="totalPlayerCount()"
-            [hasSubmitted]="hasSubmitted()"
-          ></app-guessing>
+          @for (r of [currentRound()]; track r) {
+            <app-guessing
+              [roomCode]="roomCode"
+              [imageUrl]="imageUrl() ?? ''"
+              [submittedCount]="submittedCount()"
+              [totalCount]="totalPlayerCount()"
+              [hasSubmitted]="hasSubmitted()"
+            ></app-guessing>
+          }
         }
       </div>
       @if (!wsConnected()) {

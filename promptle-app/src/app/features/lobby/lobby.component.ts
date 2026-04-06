@@ -1,5 +1,4 @@
 import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
-import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
@@ -11,6 +10,7 @@ import { PlayerService } from '../../core/services/player.service';
 import { PlayerCardComponent } from '../../shared/components/player-card/player-card.component';
 import { PlayerDto } from '../../core/models/player.model';
 import { RoomEvent } from '../../core/models/events.model';
+import { StompSubscription } from '@stomp/stompjs';
 
 const DUPLICATE_TAB_TIMEOUT_MS = 50;
 
@@ -29,9 +29,11 @@ export class LobbyComponent implements OnInit, OnDestroy {
   playerId = '';
   private playerToken = '';
   roomCode = '';
+  private navigatingToGame = false;
 
   private channel: BroadcastChannel | null = null;
   private duplicateCheckTimer: ReturnType<typeof setTimeout> | null = null;
+  private _roomSub: StompSubscription | null = null;
 
   isHost = computed(() => this.playerId !== '' && this.playerId === this.hostId());
 
@@ -81,7 +83,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
       clearTimeout(this.duplicateCheckTimer);
     }
     this.channel?.close();
-    if (!this.duplicateSession()) {
+    if (!this.duplicateSession() && !this.navigatingToGame) {
       this.webSocketService.disconnect();
     }
   }
@@ -95,12 +97,14 @@ export class LobbyComponent implements OnInit, OnDestroy {
     });
 
     this.webSocketService.connect(this.playerToken, this.roomCode, () => {
-      this.webSocketService.subscribe(`/topic/room/${this.roomCode}`, (event: unknown) => {
+      this._roomSub = this.webSocketService.subscribe(`/topic/room/${this.roomCode}`, (event: unknown) => {
         const roomEvent = event as RoomEvent;
         if (roomEvent.type === 'PLAYER_JOINED' || roomEvent.type === 'PLAYER_LEFT' || roomEvent.type === 'HOST_CHANGED') {
           this.players.set(roomEvent.players);
           this.hostId.set(roomEvent.hostId);
         } else if (roomEvent.type === 'GAME_STARTED') {
+          this.navigatingToGame = true;
+          this._roomSub?.unsubscribe();
           this.router.navigate(['/game', this.roomCode]);
         }
       });
@@ -117,7 +121,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
     if (this.starting()) return;
     this.starting.set(true);
     this.roomApiService.startGame(this.roomCode, this.playerToken).subscribe({
-      error: (err: HttpErrorResponse) => { if (err.status !== 409) this.starting.set(false); },
+      error: () => this.starting.set(false),
     });
   }
 
