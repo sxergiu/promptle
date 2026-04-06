@@ -31,7 +31,7 @@ class TimerServiceTest {
 
     @BeforeEach
     void setUp() {
-        timerService = new TimerService(taskScheduler, gameService);
+        timerService = new TimerService(taskScheduler, gameService, 120L);
     }
 
     // ---- startRoundTimer ----

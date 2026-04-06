@@ -1,5 +1,6 @@
 package com.app.promptle.game.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
@@ -10,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
 /**
- * Stub — fully implemented in a later chunk.
  * Manages round timers for game phases.
  */
 @Service
@@ -18,11 +18,14 @@ public class TimerService {
 
     private final TaskScheduler taskScheduler;
     private final GameService gameService;
+    private final long generatingTimeoutSeconds;
     private final Map<String, ScheduledFuture<?>> timers = new ConcurrentHashMap<>();
 
-    public TimerService(TaskScheduler taskScheduler, @Lazy GameService gameService) {
+    public TimerService(TaskScheduler taskScheduler, @Lazy GameService gameService,
+                        @Value("${game.timer.generating-timeout-seconds:120}") long generatingTimeoutSeconds) {
         this.taskScheduler = taskScheduler;
         this.gameService = gameService;
+        this.generatingTimeoutSeconds = generatingTimeoutSeconds;
     }
 
     /**
@@ -43,7 +46,7 @@ public class TimerService {
      * which is idempotent — if generation already completed normally this is a no-op.
      */
     public void startGeneratingTimeout(String roomCode, int round) {
-        Instant fireAt = Instant.now().plusSeconds(30);
+        Instant fireAt = Instant.now().plusSeconds(generatingTimeoutSeconds);
         ScheduledFuture<?> future = taskScheduler.schedule(
                 () -> gameService.onAllImagesReady(roomCode),
                 fireAt
