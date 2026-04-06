@@ -61,4 +61,14 @@ public class RoundAssignmentService {
                 .map(RoundAssignment::getChain)
                 .orElseThrow(() -> new GameException("No assignment found"));
     }
+
+    /**
+     * Returns the player assigned to the given chain for the given round.
+     */
+    public Player getAssignedPlayer(Room room, Chain chain, int round) {
+        return roundAssignmentRepository
+                .findByRoomAndRoundAndChain(room, round, chain)
+                .map(RoundAssignment::getPlayer)
+                .orElseThrow(() -> new GameException("No assignment found for chain in round " + round));
+    }
 }
