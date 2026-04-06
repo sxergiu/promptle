@@ -1,4 +1,4 @@
-# Promptle 🎮
+# Promptle ☎️
 
 > **The AI Telephone** — a real-time multiplayer party game where prompts become images, images become guesses, and guesses become chaos.
 
