@@ -308,6 +308,7 @@ class GameServiceTest {
     void submitPrompt_SavesChainEntryWithCorrectFields() {
         Room room = buildRoom("ABCD1234", GamePhase.PROMPTING);
         room.setCurrentRound(1);
+        room.setTotalRounds(2);
         UUID playerId = UUID.randomUUID();
         Player player = buildPlayer(playerId, room);
         Chain chain = buildChain(player, room);
@@ -335,6 +336,7 @@ class GameServiceTest {
     void submitPrompt_PublishesSubmissionUpdateEvent() {
         Room room = buildRoom("ABCD1234", GamePhase.PROMPTING);
         room.setCurrentRound(1);
+        room.setTotalRounds(2);
         UUID playerId = UUID.randomUUID();
         Player player = buildPlayer(playerId, room);
         Chain chain = buildChain(player, room);
@@ -359,6 +361,7 @@ class GameServiceTest {
     void submitPrompt_AllSubmitted_CancelsTimerAndSetsGeneratingPhase() {
         Room room = buildRoom("ABCD1234", GamePhase.PROMPTING);
         room.setCurrentRound(1);
+        room.setTotalRounds(1);
         UUID playerId = UUID.randomUUID();
         Player player = buildPlayer(playerId, room);
         Chain chain = buildChain(player, room);
@@ -386,6 +389,7 @@ class GameServiceTest {
     void submitPrompt_PartialSubmission_DoesNotCancelTimer() {
         Room room = buildRoom("ABCD1234", GamePhase.PROMPTING);
         room.setCurrentRound(1);
+        room.setTotalRounds(2);
         UUID playerId = UUID.randomUUID();
         Player player = buildPlayer(playerId, room);
         Chain chain = buildChain(player, room);
@@ -423,6 +427,7 @@ class GameServiceTest {
     void submitGuess_SavesEntryOnAssignedChain() {
         Room room = buildRoom("ABCD1234", GamePhase.GUESSING);
         room.setCurrentRound(2);
+        room.setTotalRounds(2);
         UUID playerId = UUID.randomUUID();
         Player player = buildPlayer(playerId, room);
         Chain assignedChain = new Chain();
@@ -452,6 +457,7 @@ class GameServiceTest {
     void submitGuess_PublishesSubmissionUpdateEvent() {
         Room room = buildRoom("ABCD1234", GamePhase.GUESSING);
         room.setCurrentRound(2);
+        room.setTotalRounds(2);
         UUID playerId = UUID.randomUUID();
         Player player = buildPlayer(playerId, room);
         Chain assignedChain = buildChain(buildPlayer(UUID.randomUUID(), room), room);
@@ -641,7 +647,7 @@ class GameServiceTest {
     }
 
     @Test
-    void endPromptingRound_TriggersImageGenerationForEachConnectedPlayer() {
+    void endPromptingRound_PublishesGeneratingPhaseChangedEvent() {
         Room room = buildRoom("ABCD1234", GamePhase.PROMPTING);
         room.setCurrentRound(1);
         Player p1 = buildPlayer(UUID.randomUUID(), room);
@@ -649,23 +655,46 @@ class GameServiceTest {
         Chain c1 = buildChain(p1, room);
         Chain c2 = buildChain(p2, room);
 
-        ChainEntry entry1 = new ChainEntry();
-        entry1.setText("prompt text 1");
-        ChainEntry entry2 = new ChainEntry();
-        entry2.setText("prompt text 2");
-
         when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
         when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(p1, p2));
         when(chainRepository.findByRoom(room)).thenReturn(List.of(c1, c2));
-        when(chainEntryRepository.findByChainAndRound(c1, 1)).thenReturn(Optional.of(entry1));
-        when(chainEntryRepository.findByChainAndRound(c2, 1)).thenReturn(Optional.of(entry2));
         when(chainRepository.findByRoomAndOriginPlayer(room, p1)).thenReturn(Optional.of(c1));
         when(chainRepository.findByRoomAndOriginPlayer(room, p2)).thenReturn(Optional.of(c2));
+        when(chainEntryRepository.findByChainAndRound(any(), eq(1))).thenReturn(Optional.empty());
         when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        gameService.onRoundTimerExpired("ABCD1234", 1);
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher, atLeastOnce()).publishEvent(captor.capture());
+        boolean hasGeneratingEvent = captor.getAllValues().stream()
+                .anyMatch(e -> e instanceof PhaseChangedApplicationEvent p
+                        && p.phase() == GamePhase.GENERATING);
+        assertTrue(hasGeneratingEvent);
+    }
+
+    @Test
+    void onStartImageGeneration_TriggersImageGenerationForEachChain() {
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(1);
+        Player p1 = buildPlayer(UUID.randomUUID(), room);
+        Player p2 = buildPlayer(UUID.randomUUID(), room);
+        Chain c1 = buildChain(p1, room);
+        Chain c2 = buildChain(p2, room);
+
+        ChainEntry entry1 = new ChainEntry(); entry1.setText("prompt 1");
+        ChainEntry entry2 = new ChainEntry(); entry2.setText("prompt 2");
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(c1, c2));
+        when(chainEntryRepository.findByChainAndRound(c1, 1)).thenReturn(Optional.of(entry1));
+        when(chainEntryRepository.findByChainAndRound(c2, 1)).thenReturn(Optional.of(entry2));
+        when(chainEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(imageGenerationService.generateImage(anyString()))
                 .thenReturn(CompletableFuture.completedFuture("/img/url"));
 
-        gameService.onRoundTimerExpired("ABCD1234", 1);
+        StartImageGenerationEvent event = new StartImageGenerationEvent("ABCD1234");
+        gameService.onStartImageGeneration(event);
 
         verify(imageGenerationService, times(2)).generateImage(anyString());
     }
@@ -980,6 +1009,7 @@ class GameServiceTest {
     void submitPrompt_IgnoresSecondSubmission_WhenPlayerAlreadySubmittedThisRound() {
         Room room = buildRoom("ABCD1234", GamePhase.PROMPTING);
         room.setCurrentRound(1);
+        room.setTotalRounds(2);
         UUID playerId = UUID.randomUUID();
         Player player = buildPlayer(playerId, room);
         Chain chain = buildChain(player, room);
@@ -1024,6 +1054,7 @@ class GameServiceTest {
     void submitGuess_IgnoresSecondSubmission_WhenPlayerAlreadySubmittedThisRound() {
         Room room = buildRoom("ABCD1234", GamePhase.GUESSING);
         room.setCurrentRound(2);
+        room.setTotalRounds(2);
         UUID playerId = UUID.randomUUID();
         Player player = buildPlayer(playerId, room);
         Chain assignedChain = buildChain(buildPlayer(UUID.randomUUID(), room), room);
@@ -1058,6 +1089,36 @@ class GameServiceTest {
                 .count();
         assertEquals(1L, updateCount,
                 "SubmissionUpdateApplicationEvent must be published exactly once for the first guess");
+    }
+
+    // ---- Fix 3: submission threshold uses totalRounds, not connected count ----
+
+    @Test
+    void submitPrompt_DoesNotEndRound_WhenDisconnectedPlayerReducesConnectedCount() {
+        // 2-player game, but one disconnects mid-round — only 1 connected.
+        // totalRounds is 2 (set at game start), so 1 submission should NOT end the round.
+        Room room = buildRoom("ABCD1234", GamePhase.PROMPTING);
+        room.setCurrentRound(1);
+        room.setTotalRounds(2);
+        UUID playerId = UUID.randomUUID();
+        Player player = buildPlayer(playerId, room);
+        Chain chain = buildChain(player, room);
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(playerRepository.findById(playerId)).thenReturn(Optional.of(player));
+        when(chainRepository.findByRoomAndOriginPlayer(room, player)).thenReturn(Optional.of(chain));
+        when(chainEntryRepository.save(any(ChainEntry.class))).thenAnswer(inv -> inv.getArgument(0));
+        // Only 1 player connected (the other disconnected)
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(player));
+        // 1 out of 2 submitted
+        when(chainEntryRepository.countByChainInAndRoundAndIsPlaceholderFalse(any(), anyInt())).thenReturn(1L);
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
+
+        gameService.submitPrompt("ABCD1234", playerId, "A prompt");
+
+        // Should NOT cancel timer or end the round — total is 2 (from totalRounds), not 1
+        verify(timerService, never()).cancelTimer(anyString());
+        assertEquals(GamePhase.PROMPTING, room.getPhase());
     }
 
     // ---- Helpers ----

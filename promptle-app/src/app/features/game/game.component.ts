@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, signal, computed, effect, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal, computed, effect } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { GamePhase } from '../../core/models/game-phase.enum';
 import { PromptingPhaseComponent } from './prompting/prompting.component';
@@ -36,9 +36,9 @@ export class GameComponent implements OnInit, OnDestroy {
   private _tickInterval: ReturnType<typeof setInterval> | null = null;
   private _pendingChains: any[] = [];
   private _hostId = '';
-  // Buffered GUESSING phase event — held until the imageUrl payload arrives so the
-  // guessing screen never renders with a "Loading image…" placeholder.
-  private _pendingGuessingEvent: PhaseChangedEvent | null = null;
+  // Set to true once any WS phase event has been applied. Used to prevent a
+  // stale HTTP snapshot from overwriting live WS state when both arrive concurrently.
+  private _wsPhaseReceived = false;
 
   readonly remainingSeconds = computed(() => {
     this._tick(); // reactive dependency — re-evaluates every second
@@ -79,48 +79,35 @@ export class GameComponent implements OnInit, OnDestroy {
       this.playerToken = stored.playerToken;
     }
 
-    this.roomApiService.getGameStateSnapshot(this.roomCode, this.playerToken).subscribe({
-      next: (snapshot) => {
-        this.phase.set(snapshot.phase);
-        this.currentRound.set(snapshot.currentRound);
-        this.totalRounds.set(snapshot.totalRounds);
-        this.timerSeconds.set(snapshot.timerSeconds);
-        this.serverTimestamp.set(snapshot.serverTimestamp);
-        this.imageUrl.set(snapshot.imageUrl);
-        this.players.set(snapshot.players);
-        // Use totalRounds (= player count set at game-start) rather than snapshot.players.length,
-        // which may be lower if not all WS handshakes completed before the snapshot was fetched.
-        this.totalPlayerCount.set(snapshot.totalRounds || snapshot.players.length);
-        this.hasSubmitted.set(snapshot.hasSubmitted);
-        this.submittedCount.set(snapshot.submittedCount);
-        this._hostId = snapshot.hostId ?? '';
-      },
-    });
+    this._fetchSnapshot();
 
     this.webSocketService.connect(this.playerToken, this.roomCode, () => {
+      const wasDisconnected = !this.wsConnected();
       this.wsConnected.set(true);
+
+      if (wasDisconnected && this._wsPhaseReceived) {
+        this._wsPhaseReceived = false;
+        this._fetchSnapshot();
+      }
+
       this.webSocketService.subscribe(`/topic/game/${this.roomCode}`, (event: unknown) => {
         const payload = event as Record<string, unknown>;
         if ('phase' in payload) {
           const phaseEvent = event as PhaseChangedEvent;
           if (phaseEvent.phase === GamePhase.RESULTS) return; // wait for GameResultsEvent which carries chains
 
-          if (phaseEvent.phase === GamePhase.GUESSING) {
-            // Buffer: the imageUrl arrives in a separate /user/queue/game message sent
-            // right after this broadcast. Delay the phase flip until it lands so the
-            // guessing screen never renders with a "Loading image…" placeholder.
-            this._pendingGuessingEvent = phaseEvent;
-            // Edge case: imageUrl already arrived (rare network reordering)
-            if (this.imageUrl() !== null) {
-              this._flushPendingGuessing();
-            }
-            return;
-          }
+          this._wsPhaseReceived = true;
 
-          // Entering GENERATING clears the stale imageUrl from the previous round
-          // so the buffer check above works correctly on round 2+.
           if (phaseEvent.phase === GamePhase.GENERATING) {
             this.imageUrl.set(null);
+          }
+
+          if (phaseEvent.phase === GamePhase.GUESSING) {
+            // Apply the phase immediately — don't buffer waiting for RoundReadyPayload.
+            // Fetch imageUrl from the HTTP snapshot instead (reliable, no user-queue dependency).
+            this._applyPhaseEvent(phaseEvent);
+            this._fetchImageUrl();
+            return;
           }
 
           this._applyPhaseEvent(phaseEvent);
@@ -130,7 +117,7 @@ export class GameComponent implements OnInit, OnDestroy {
           this.totalPlayerCount.set((subEvent as any).totalCount ?? this.totalPlayerCount());
         } else if ('chains' in payload) {
           this._pendingChains = (payload as any).chains;
-          this.phase.set(GamePhase.RESULTS); // triggers effect → navigate with chains already set
+          this.phase.set(GamePhase.RESULTS);
         }
       });
 
@@ -141,15 +128,44 @@ export class GameComponent implements OnInit, OnDestroy {
           this._pendingChains = resultsEvent.chains;
           this.phase.set(GamePhase.RESULTS);
         } else {
+          // RoundReadyPayload — still accept it if it arrives (updates imageUrl faster than HTTP).
           const roundReady = event as RoundReadyPayload;
           this.imageUrl.set(roundReady.imageUrl);
-          // Flush the buffered GUESSING transition now that the image URL is ready.
-          if (this._pendingGuessingEvent) {
-            this._flushPendingGuessing();
-          }
         }
       });
     }, 5000, () => this.wsConnected.set(false));
+  }
+
+  private _fetchSnapshot(): void {
+    this.roomApiService.getGameStateSnapshot(this.roomCode, this.playerToken).subscribe({
+      next: (snapshot) => {
+        this.totalRounds.set(snapshot.totalRounds);
+        this.players.set(snapshot.players);
+        this.totalPlayerCount.set(snapshot.totalRounds || snapshot.players.length);
+        this._hostId = snapshot.hostId ?? '';
+
+        if (!this._wsPhaseReceived) {
+          this.phase.set(snapshot.phase);
+          this.currentRound.set(snapshot.currentRound);
+          this.timerSeconds.set(snapshot.timerSeconds);
+          this.serverTimestamp.set(snapshot.serverTimestamp);
+          this.imageUrl.set(snapshot.imageUrl);
+          this.hasSubmitted.set(snapshot.hasSubmitted);
+          this.submittedCount.set(snapshot.submittedCount);
+        }
+      },
+    });
+  }
+
+  /** Fetches only the imageUrl from the snapshot for the current GUESSING round. */
+  private _fetchImageUrl(): void {
+    this.roomApiService.getGameStateSnapshot(this.roomCode, this.playerToken).subscribe({
+      next: (snapshot) => {
+        if (snapshot.phase === GamePhase.GUESSING && snapshot.imageUrl) {
+          this.imageUrl.set(snapshot.imageUrl);
+        }
+      },
+    });
   }
 
   private _applyPhaseEvent(e: PhaseChangedEvent): void {
@@ -162,19 +178,11 @@ export class GameComponent implements OnInit, OnDestroy {
     this.submittedCount.set(0);
   }
 
-  private _flushPendingGuessing(): void {
-    const e = this._pendingGuessingEvent!;
-    this._pendingGuessingEvent = null;
-    this._applyPhaseEvent(e);
-  }
-
   ngOnDestroy(): void {
     if (this._tickInterval !== null) {
       clearInterval(this._tickInterval);
       this._tickInterval = null;
     }
-    // Do not disconnect when transitioning to the results child route —
-    // ResultsComponent reuses the same live connection for showcase events.
     if (this.phase() !== GamePhase.RESULTS) {
       this.webSocketService.disconnect();
     }

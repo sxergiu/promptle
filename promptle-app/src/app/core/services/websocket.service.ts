@@ -6,6 +6,14 @@ export class WebSocketService {
   private client!: Client;
 
   connect(token: string, roomCode: string, onConnect?: () => void, reconnectDelay = 5000, onDisconnect?: () => void): void {
+    if (this.client?.connected) {
+      this.client.reconnectDelay = reconnectDelay;
+      if (onDisconnect) {
+        this.client.onDisconnect = () => onDisconnect();
+      }
+      onConnect?.();
+      return;
+    }
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const host = window.location.host;
     this.client = new Client({

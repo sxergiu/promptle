@@ -14,9 +14,14 @@ import com.app.promptle.room.model.Player;
 import com.app.promptle.room.model.Room;
 import com.app.promptle.room.repository.PlayerRepository;
 import com.app.promptle.room.repository.RoomRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +33,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class GameService {
+
+    private static final Logger log = LoggerFactory.getLogger(GameService.class);
 
     private final RoomRepository roomRepository;
     private final PlayerRepository playerRepository;
@@ -139,7 +146,7 @@ public class GameService {
         chainEntryRepository.save(entry);
 
         int submitted = countSubmittedForCurrentRound(room);
-        int total = playerRepository.findByRoomAndConnectedTrue(room).size();
+        int total = room.getTotalRounds();
         eventPublisher.publishEvent(new SubmissionUpdateApplicationEvent(roomCode, submitted, total));
 
         if (submitted >= total) {
@@ -169,7 +176,7 @@ public class GameService {
         chainEntryRepository.save(entry);
 
         int submitted = countSubmittedForCurrentRound(room);
-        int total = playerRepository.findByRoomAndConnectedTrue(room).size();
+        int total = room.getTotalRounds();
         eventPublisher.publishEvent(new SubmissionUpdateApplicationEvent(roomCode, submitted, total));
 
         if (submitted >= total) {
@@ -182,6 +189,10 @@ public class GameService {
     public void onRoundTimerExpired(String roomCode, int round) {
         Room room = getRoom(roomCode);
         if (room.getCurrentRound() != round) return;
+        // Guard: if all players submitted before the timer fired, the phase
+        // has already advanced (e.g., to GENERATING). Only act if still in
+        // a submission-accepting phase to prevent duplicate transitions.
+        if (room.getPhase() != GamePhase.PROMPTING && room.getPhase() != GamePhase.GUESSING) return;
 
         insertPlaceholders(room);
         if (room.getPhase() == GamePhase.PROMPTING) {
@@ -199,8 +210,13 @@ public class GameService {
 
     @Transactional
     public void onAllImagesReady(String roomCode) {
+        log.info("[{}] onAllImagesReady fired", roomCode);
+        timerService.cancelGeneratingTimeout(roomCode);
         Room room = getRoom(roomCode);
-        if (room.getPhase() != GamePhase.GENERATING) return;
+        if (room.getPhase() != GamePhase.GENERATING) {
+            log.warn("[{}] onAllImagesReady: phase is {} — skipping GUESSING transition", roomCode, room.getPhase());
+            return;
+        }
         int oldRound = room.getCurrentRound();
         int newRound = oldRound + 1;
 
@@ -209,9 +225,9 @@ public class GameService {
         room.setRoundStartedAt(Instant.now());
         roomRepository.save(room);
 
-        List<Player> connected = playerRepository.findByRoomAndConnectedTrue(room);
+        List<Player> allPlayers = playerRepository.findByRoom(room);
         Map<UUID, String> playerImageUrls = new HashMap<>();
-        for (Player player : connected) {
+        for (Player player : allPlayers) {
             Chain assignedChain = roundAssignmentService.getAssignedChain(room, player, newRound);
             chainEntryRepository.findByChainAndRound(assignedChain, oldRound)
                     .ifPresent(entry -> playerImageUrls.put(player.getId(), entry.getImageUrl()));
@@ -222,6 +238,19 @@ public class GameService {
         eventPublisher.publishEvent(new PhaseChangedApplicationEvent(
                 roomCode, GamePhase.GUESSING, newRound, room.getTotalRounds(), guessingSeconds, now.toEpochMilli()));
         eventPublisher.publishEvent(new RoundReadyApplicationEvent(roomCode, newRound, playerImageUrls));
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void onStartImageGeneration(StartImageGenerationEvent event) {
+        log.info("[{}] onStartImageGeneration fired — starting image generation", event.roomCode());
+        Room room = roomRepository.findByRoomCode(event.roomCode()).orElse(null);
+        if (room == null || room.getPhase() != GamePhase.GENERATING) {
+            log.warn("[{}] onStartImageGeneration: room phase is {} — skipping", event.roomCode(),
+                    room == null ? "null" : room.getPhase());
+            return;
+        }
+        triggerImageGeneration(room);
     }
 
     @Transactional
@@ -236,14 +265,19 @@ public class GameService {
     // ---- Private helpers ----
 
     private void insertPlaceholders(Room room) {
-        List<Player> connected = playerRepository.findByRoomAndConnectedTrue(room);
-        for (Player player : connected) {
-            Chain chain = resolveChainForPlayer(room, player);
-            chainEntryRepository.findByChainAndRound(chain, room.getCurrentRound()).orElseGet(() -> {
+        List<Chain> chains = chainRepository.findByRoom(room);
+        int round = room.getCurrentRound();
+        for (Chain chain : chains) {
+            chainEntryRepository.findByChainAndRound(chain, round).orElseGet(() -> {
+                // For PROMPTING (round 1), the author is the chain originator.
+                // For GUESSING (round 2+), the author is the player assigned to this chain.
+                Player author = (room.getPhase() == GamePhase.PROMPTING)
+                        ? chain.getOriginPlayer()
+                        : roundAssignmentService.getAssignedPlayer(room, chain, round);
                 ChainEntry placeholder = new ChainEntry();
                 placeholder.setChain(chain);
-                placeholder.setRound(room.getCurrentRound());
-                placeholder.setAuthor(player);
+                placeholder.setRound(round);
+                placeholder.setAuthor(author);
                 placeholder.setText("Wise Hipiotic Cow");
                 placeholder.setPlaceholder(true);
                 return chainEntryRepository.save(placeholder);
@@ -251,23 +285,19 @@ public class GameService {
         }
     }
 
-    private Chain resolveChainForPlayer(Room room, Player player) {
-        if (room.getPhase() == GamePhase.PROMPTING) {
-            return chainRepository.findByRoomAndOriginPlayer(room, player).orElseThrow();
-        } else {
-            return roundAssignmentService.getAssignedChain(room, player, room.getCurrentRound());
-        }
-    }
-
     private void endPromptingRound(Room room) {
         room.setPhase(GamePhase.GENERATING);
         roomRepository.save(room);
 
-        triggerImageGeneration(room);
-
         eventPublisher.publishEvent(new PhaseChangedApplicationEvent(
                 room.getRoomCode(), GamePhase.GENERATING, room.getCurrentRound(),
                 room.getTotalRounds(), 0, Instant.now().toEpochMilli()));
+        // Published AFTER the phase change event — Spring processes after-commit
+        // synchronizations in publication order, so the GENERATING broadcast is
+        // guaranteed to reach clients before image generation begins.
+        eventPublisher.publishEvent(new StartImageGenerationEvent(room.getRoomCode()));
+
+        timerService.startGeneratingTimeout(room.getRoomCode(), room.getCurrentRound());
     }
 
     private void endGuessingRound(Room room) {
@@ -300,11 +330,12 @@ public class GameService {
             room.setPhase(GamePhase.GENERATING);
             roomRepository.save(room);
 
-            triggerImageGeneration(room);
-
             eventPublisher.publishEvent(new PhaseChangedApplicationEvent(
                     room.getRoomCode(), GamePhase.GENERATING, room.getCurrentRound(),
                     room.getTotalRounds(), 0, Instant.now().toEpochMilli()));
+            eventPublisher.publishEvent(new StartImageGenerationEvent(room.getRoomCode()));
+
+            timerService.startGeneratingTimeout(room.getRoomCode(), room.getCurrentRound());
         }
     }
 
@@ -329,7 +360,7 @@ public class GameService {
                 .toList();
 
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                .whenCompleteAsync((result, ex) ->
+                .whenComplete((result, ex) ->
                         eventPublisher.publishEvent(new AllImagesReadyApplicationEvent(roomCode)));
     }
 
