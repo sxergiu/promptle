@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    # No volume — per "no persistence" requirement.
+    # Not exposed to host.
+    networks:
+      - promptle
+
+  backend:
+    build: ./promptle
+    depends_on:
+      - postgres
+    environment:
+      # DB — reaches the postgres service via compose DNS
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/postgres
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+
+      # Image generation — reaches native ComfyUI on the host Mac
+      IMAGE_GENERATION_PROVIDER: comfyui
+      IMAGE_GENERATION_COMFYUI_URL: http://host.docker.internal:8188
+      IMAGE_GENERATION_COMFYUI_WORKFLOW: comfyui-workflow-api.json
+      IMAGE_GENERATION_COMFYUI_PROMPT_NODE_ID: "6"
+      IMAGE_GENERATION_COMFYUI_OUTPUT_NODE_ID: "9"
+
+      # Image storage — ephemeral tmpfs volume mounted below
+      IMAGE_STORAGE_PROVIDER: local
+      IMAGE_STORAGE_LOCAL_PATH: /var/promptle-images
+
+      # Timers — generous safety net for M1 serial generation (3-5 players)
+      GAME_TIMER_GENERATING_TIMEOUT_SECONDS: "300"
+
+    # Required so host.docker.internal resolves on Linux; harmless on macOS.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    tmpfs:
+      - /var/promptle-images
+
+    networks:
+      - promptle
+    # Not exposed to host — only the frontend talks to it.
+
+  frontend:
+    build: ./promptle-app
+    depends_on:
+      - backend
+    ports:
+      - "80:80"   # the only port exposed to the LAN
+    networks:
+      - promptle
+
+networks:
+  promptle:
+    driver: bridge
