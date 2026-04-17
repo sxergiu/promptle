@@ -12,6 +12,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
@@ -28,7 +29,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class ComfyUIGenerationService implements ImageGenerationService {
 
     private static final Logger log = LoggerFactory.getLogger(ComfyUIGenerationService.class);
-    private static final int MAX_POLL_ATTEMPTS = 120;
+    private static final int MAX_POLL_ATTEMPTS = 240;
 
     private final RestTemplate restTemplate;
     private final ImageStorageService imageStorageService;
@@ -46,7 +47,10 @@ public class ComfyUIGenerationService implements ImageGenerationService {
                                     @Value("${image.generation.comfyui.workflow:comfyui-workflow-api.json}") String workflowResource,
                                     @Value("${image.generation.comfyui.prompt-node-id:6}") String promptNodeId,
                                     @Value("${image.generation.comfyui.output-node-id:9}") String outputNodeId) throws IOException {
-        this.restTemplate = new RestTemplate();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5_000);
+        factory.setReadTimeout(30_000);
+        this.restTemplate = new RestTemplate(factory);
         this.imageStorageService = imageStorageService;
         this.objectMapper = objectMapper;
         this.comfyUiUrl = comfyUiUrl;
