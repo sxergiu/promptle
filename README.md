@@ -44,7 +44,7 @@ Play with friends on the same Wi-Fi using real AI-generated images.
 
 ```bash
 # 1. Start ComfyUI
-~/ComfyUI/start-comfyui.sh
+./start-comfyui.sh
 
 # 2. Start the app
 docker compose build && docker compose up -d
