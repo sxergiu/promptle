@@ -108,11 +108,42 @@ export class LobbyComponent implements OnInit, OnDestroy {
           this.router.navigate(['/game', this.roomCode]);
         }
       });
+
+      // Re-fetch snapshot after subscribing to catch any events
+      // missed during the WS handshake window
+      this.roomApiService.getGameStateSnapshot(this.roomCode, this.playerToken).subscribe({
+        next: (state) => {
+          this.players.set(state.players);
+          this.hostId.set(state.hostId);
+        },
+      });
     }, 0); // no auto-reconnect in lobby
   }
 
+  copied = signal(false);
+
   inviteOthers(): void {
-    navigator.clipboard.writeText(`${window.location.origin}/join/${this.roomCode}`);
+    const url = `${window.location.origin}/join/${this.roomCode}`;
+    if (navigator.share) {
+      navigator.share({ title: 'Join Promptle', url }).catch(() => {});
+      return;
+    }
+    const textarea = document.createElement('textarea');
+    textarea.value = url;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    if (!ok && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).catch(() => window.prompt('Copy this link:', url));
+    } else if (!ok) {
+      window.prompt('Copy this link:', url);
+    }
+    this.copied.set(true);
+    setTimeout(() => this.copied.set(false), 2000);
   }
 
   starting = signal(false);
