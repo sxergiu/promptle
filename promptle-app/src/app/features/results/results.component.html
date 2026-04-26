@@ -59,8 +59,12 @@
       </div>
 
       <div class="results-actions">
-        <button mat-icon-button (click)="onExportThread()" aria-label="Export thread" title="Export thread">
-          <mat-icon>download</mat-icon>
+        <button mat-icon-button
+                (click)="onExportThread()"
+                [disabled]="exporting()"
+                aria-label="Export thread"
+                title="Export thread">
+          <mat-icon>{{ exporting() ? 'hourglass_empty' : 'download' }}</mat-icon>
         </button>
         <button
           mat-raised-button

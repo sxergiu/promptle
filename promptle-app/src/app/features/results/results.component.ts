@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit, signal, computed, inject, effect } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { WebSocketService } from '../../core/services/websocket.service';
@@ -18,6 +19,7 @@ import { environment } from '../../../environments/environment';
   templateUrl: './results.component.html',
 })
 export class ResultsComponent implements OnInit, OnDestroy {
+  private readonly http = inject(HttpClient);
   private readonly webSocketService = inject(WebSocketService);
   private readonly playerService = inject(PlayerService);
   private readonly roomApiService = inject(RoomApiService);
@@ -30,6 +32,7 @@ export class ResultsComponent implements OnInit, OnDestroy {
   revealedEntryCount = signal<number>(0);
   isHost = signal<boolean>(false);
   canProceed = signal<boolean>(false);
+  exporting = signal<boolean>(false);
 
   private readonly _allChainsCompleted = signal<boolean>(false);
   readonly allChainsCompleted = this._allChainsCompleted.asReadonly();
@@ -146,7 +149,35 @@ export class ResultsComponent implements OnInit, OnDestroy {
     });
   }
 
-  onExportThread(): void {}
+  onExportThread(): void {
+    if (this.exporting()) return;
+    this.exporting.set(true);
+
+    const token = this.playerService.loadFromLocalStorage(this._roomCode)?.playerToken ?? '';
+    const chain = this.chains()[this.currentChainIndex()];
+
+    this.http.post(
+      `/api/export/${this._roomCode}`,
+      { chain, players: this.players() },
+      {
+        headers: { 'X-Player-Token': token },
+        responseType: 'blob'
+      }
+    ).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `promptle-chain-${this.currentChainIndex() + 1}.gif`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.exporting.set(false);
+      },
+      error: () => {
+        this.exporting.set(false);
+      }
+    });
+  }
 
   ngOnDestroy(): void {
     this._clearInterval();
