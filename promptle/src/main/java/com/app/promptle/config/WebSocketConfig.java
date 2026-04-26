@@ -27,7 +27,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.addEndpoint("/ws")
                 .setHandshakeHandler(handshakeHandler)
                 .addInterceptors(new RoomCodeHandshakeInterceptor())
-                .setAllowedOrigins("http://localhost:4200");
+                .setAllowedOriginPatterns("*");
     }
 
     @Override

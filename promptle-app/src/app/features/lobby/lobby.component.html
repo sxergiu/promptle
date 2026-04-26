@@ -35,7 +35,7 @@
     <div class="lobby-actions">
       @if (isHost()) {
         <button type="button" mat-raised-button class="btn-green" (click)="inviteOthers()">
-          Copy Invite Link
+          {{ copied() ? 'Copied!' : 'Copy Invite Link' }}
         </button>
       }
 
