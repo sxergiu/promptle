@@ -1,9 +1,13 @@
+$cell-size: 14px;
+$cell-size-md: 12px;
+$cell-size-sm: 10px;
+
 .generating-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2rem;
-  padding: 3rem 2rem;
+  gap: 1.5rem;
+  padding: 2rem 2rem 3rem;
   animation: fadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -12,47 +16,7 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Double-ring spinner ── */
-.spinner-wrap {
-  position: relative;
-  width: 96px;
-  height: 96px;
-}
-
-.spinner {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  border: 4px solid var(--color-border);
-  border-top-color: var(--color-primary);
-  animation: spin 1s linear infinite;
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-
-.spinner-outer {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  border: 3px solid transparent;
-  border-bottom-color: var(--p-green);
-  border-left-color: rgba(98, 130, 102, 0.35);
-  animation: spinReverse 1.5s linear infinite;
-  position: absolute;
-  top: 0;
-  left: 0;
-  box-sizing: border-box;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes spinReverse {
-  to { transform: rotate(-360deg); }
-}
-
+/* ── Title ── */
 .generating-title {
   font-size: 0.75rem;
   font-weight: 800;
@@ -78,30 +42,177 @@
   100% { content: ''; }
 }
 
-.generating-sub {
-  font-size: 0.55rem;
+/* ── Phone float container ── */
+.phone-float {
+  position: relative;
+  animation: phoneFloat 4s ease-in-out infinite;
+}
+
+@keyframes phoneFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
+/* ── Pixel Canvas (the phone shape) ── */
+.pixel-canvas {
+  display: grid;
+  gap: 0px;
+  position: relative;
+  cursor: default;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  filter: drop-shadow(3px 5px 0 rgba(0, 0, 0, 0.2));
+}
+
+/* ── Pixel Cells ── */
+.pixel-cell {
+  width: $cell-size;
+  height: $cell-size;
+
+  &--empty {
+    pointer-events: none;
+    background: transparent !important;
+  }
+
+  &--body,
+  &--antenna {
+    pointer-events: none;
+  }
+
+  &--screen {
+    cursor: pointer;
+    transition: background-color 0.6s ease;
+
+    &:hover {
+      filter: brightness(1.3);
+      z-index: 1;
+    }
+
+    &.popped {
+      animation: popBurst 0.3s ease-out;
+    }
+  }
+
+  &--phone {
+    cursor: pointer;
+    animation: phonePulse 3s ease-in-out infinite;
+
+    &.ringing {
+      animation: phoneRing 0.6s ease-in-out;
+    }
+  }
+
+  &--button {
+    cursor: pointer;
+    transition: filter 0.1s ease, transform 0.1s ease;
+
+    &:hover {
+      filter: brightness(1.2);
+    }
+
+    &:active,
+    &.btn-pressed {
+      filter: brightness(0.7);
+      transform: scale(0.9);
+    }
+  }
+}
+
+/* ── Phone icon breathing pulse ── */
+@keyframes phonePulse {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.3); }
+}
+
+/* ── Phone icon ring/shake ── */
+@keyframes phoneRing {
+  0%       { transform: rotate(0deg); }
+  10%      { transform: rotate(-8deg) scale(1.1); }
+  20%      { transform: rotate(8deg) scale(1.1); }
+  30%      { transform: rotate(-6deg); }
+  40%      { transform: rotate(6deg); }
+  50%      { transform: rotate(-4deg); }
+  60%      { transform: rotate(4deg); }
+  70%      { transform: rotate(-2deg); }
+  80%      { transform: rotate(2deg); }
+  100%     { transform: rotate(0deg) scale(1); }
+}
+
+/* ── Screen cell pop ── */
+@keyframes popBurst {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.4); filter: brightness(1.5); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+/* ── Heartbeat — double brightness pulse on all screen cells ── */
+.pixel-canvas.heartbeating .pixel-cell--screen {
+  animation: heartbeat 0.8s ease-in-out !important;
+}
+
+@keyframes heartbeat {
+  0%   { filter: brightness(1); }
+  15%  { filter: brightness(1.8); }
+  30%  { filter: brightness(1); }
+  45%  { filter: brightness(1.6); }
+  60%  { filter: brightness(1); }
+  100% { filter: brightness(1); }
+}
+
+/* ── Particles ── */
+.particle {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  pointer-events: none;
+  animation: particleFly 0.5s ease-out forwards;
+  z-index: 10;
+}
+
+@keyframes particleFly {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(0.3);
+  }
+}
+
+/* ── Rotating Message ── */
+.generating-message {
+  font-size: 0.6rem;
   color: var(--color-on-surface);
   opacity: 0;
   margin: 0;
   text-align: center;
-  max-width: 280px;
+  max-width: 320px;
   line-height: 2;
-  animation: messagesCycle 12s ease-in-out infinite;
+  transition: opacity 0.4s ease;
+  min-height: 2.4em;
+
+  &.visible {
+    opacity: 0.6;
+  }
 }
 
-// Cycle through multiple messages with keyframe opacity transitions
-@keyframes messagesCycle {
-  0%    { opacity: 0; }
-  5%    { opacity: 0.55; }
-  28%   { opacity: 0.55; }
-  33%   { opacity: 0; }
-  38%   { opacity: 0; }
-  38.1% { opacity: 0.55; }
-  61%   { opacity: 0.55; }
-  66%   { opacity: 0; }
-  66.1% { opacity: 0; }
-  66.5% { opacity: 0.55; }
-  89%   { opacity: 0.55; }
-  95%   { opacity: 0; }
-  100%  { opacity: 0; }
+/* ── Responsive ── */
+@media (max-width: 767px) {
+  .pixel-cell {
+    width: $cell-size-md;
+    height: $cell-size-md;
+  }
+}
+
+@media (max-width: 399px) {
+  .pixel-cell {
+    width: $cell-size-sm;
+    height: $cell-size-sm;
+  }
+
+  .generating-message {
+    font-size: 0.55rem;
+    max-width: 260px;
+  }
 }
