@@ -42,6 +42,7 @@ class ConcurrentSubmissionTest {
     @Mock private PlayerRepository playerRepository;
     @Mock private ChainRepository chainRepository;
     @Mock private ChainEntryRepository chainEntryRepository;
+    @Mock private ArtStyleRepository artStyleRepository;
     @Mock private RoundAssignmentService roundAssignmentService;
     @Mock private TimerService timerService;
     @Mock private ImageGenerationService imageGenerationService;
@@ -61,6 +62,7 @@ class ConcurrentSubmissionTest {
                 playerRepository,
                 chainRepository,
                 chainEntryRepository,
+                artStyleRepository,
                 roundAssignmentService,
                 timerService,
                 imageGenerationService,

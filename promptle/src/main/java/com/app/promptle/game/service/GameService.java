@@ -41,6 +41,7 @@ public class GameService {
     private final PlayerRepository playerRepository;
     private final ChainRepository chainRepository;
     private final ChainEntryRepository chainEntryRepository;
+    private final ArtStyleRepository artStyleRepository;
     private final RoundAssignmentService roundAssignmentService;
     private final TimerService timerService;
     private final ImageGenerationService imageGenerationService;
@@ -56,6 +57,7 @@ public class GameService {
                        PlayerRepository playerRepository,
                        ChainRepository chainRepository,
                        ChainEntryRepository chainEntryRepository,
+                       ArtStyleRepository artStyleRepository,
                        RoundAssignmentService roundAssignmentService,
                        TimerService timerService,
                        ImageGenerationService imageGenerationService,
@@ -67,6 +69,7 @@ public class GameService {
         this.playerRepository = playerRepository;
         this.chainRepository = chainRepository;
         this.chainEntryRepository = chainEntryRepository;
+        this.artStyleRepository = artStyleRepository;
         this.roundAssignmentService = roundAssignmentService;
         this.timerService = timerService;
         this.imageGenerationService = imageGenerationService;
@@ -107,11 +110,19 @@ public class GameService {
                 .sorted(Comparator.comparing(Player::getJoinedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
 
+        List<ArtStyle> allStyles = artStyleRepository.findAll();
+        if (allStyles.size() < orderedPlayers.size()) {
+            throw new GameException("Not enough art styles configured for " + orderedPlayers.size() + " players");
+        }
+        List<ArtStyle> shuffledStyles = new ArrayList<>(allStyles);
+        Collections.shuffle(shuffledStyles);
+
         List<Chain> savedChains = new ArrayList<>();
-        for (Player player : orderedPlayers) {
+        for (int i = 0; i < orderedPlayers.size(); i++) {
             Chain chain = new Chain();
             chain.setRoom(room);
-            chain.setOriginPlayer(player);
+            chain.setOriginPlayer(orderedPlayers.get(i));
+            chain.setStyle(shuffledStyles.get(i).getName());
             savedChains.add(chainRepository.save(chain));
         }
 
@@ -316,6 +327,7 @@ public class GameService {
             List<Chain> chains = chainRepository.findByRoom(room);
             List<ChainDto> chainDtos = chains.stream()
                     .map(chain -> {
+                        // TODO(chain-style): pass chain.getStyle() into ChainDto constructor once frontend supports it.
                         List<ChainEntryDto> entryDtos = chainEntryRepository.findByChainOrderByRoundAsc(chain).stream()
                                 .map(e -> new ChainEntryDto(
                                         e.getAuthor() != null ? e.getAuthor().getId().toString() : null,
@@ -353,7 +365,9 @@ public class GameService {
                             if (entry.getText() == null) {
                                 return CompletableFuture.completedFuture(null);
                             }
-                            return imageGenerationService.generateImage(entry.getText())
+                            String style = chain.getStyle();
+                            String decorated = entry.getText() + (style != null && !style.isBlank() ? ", " + style + " style" : "");
+                            return imageGenerationService.generateImage(decorated)
                                     .thenAccept(imageUrl -> {
                                         entry.setImageUrl(imageUrl);
                                         chainEntryRepository.save(entry);
