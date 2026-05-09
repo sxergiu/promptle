@@ -6,6 +6,7 @@ import com.app.promptle.game.event.*;
 import com.app.promptle.game.model.*;
 import com.app.promptle.game.repository.*;
 import com.app.promptle.image.api.ImageGenerationService;
+import com.app.promptle.image.filter.PromptFilter;
 import com.app.promptle.room.dto.PlayerDto;
 import com.app.promptle.room.dto.RoomEvent;
 import com.app.promptle.room.dto.RoomEventType;
@@ -43,6 +44,7 @@ public class GameService {
     private final RoundAssignmentService roundAssignmentService;
     private final TimerService timerService;
     private final ImageGenerationService imageGenerationService;
+    private final PromptFilter promptFilter;
     private final ApplicationEventPublisher eventPublisher;
     private final long promptingSeconds;
     private final long guessingSeconds;
@@ -57,6 +59,7 @@ public class GameService {
                        RoundAssignmentService roundAssignmentService,
                        TimerService timerService,
                        ImageGenerationService imageGenerationService,
+                       PromptFilter promptFilter,
                        ApplicationEventPublisher eventPublisher,
                        @Value("${game.timer.prompting-seconds:60}") long promptingSeconds,
                        @Value("${game.timer.guessing-seconds:60}") long guessingSeconds) {
@@ -67,6 +70,7 @@ public class GameService {
         this.roundAssignmentService = roundAssignmentService;
         this.timerService = timerService;
         this.imageGenerationService = imageGenerationService;
+        this.promptFilter = promptFilter;
         this.eventPublisher = eventPublisher;
         this.promptingSeconds = promptingSeconds;
         this.guessingSeconds = guessingSeconds;
@@ -141,7 +145,7 @@ public class GameService {
         entry.setChain(chain);
         entry.setRound(1);
         entry.setAuthor(player);
-        entry.setText(text);
+        entry.setText(promptFilter.sanitize(text));
         entry.setPlaceholder(false);
         chainEntryRepository.save(entry);
 
@@ -171,7 +175,7 @@ public class GameService {
         entry.setChain(assignedChain);
         entry.setRound(room.getCurrentRound());
         entry.setAuthor(player);
-        entry.setText(text);
+        entry.setText(promptFilter.sanitize(text));
         entry.setPlaceholder(false);
         chainEntryRepository.save(entry);
 
