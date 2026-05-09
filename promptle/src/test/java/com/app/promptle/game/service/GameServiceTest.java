@@ -6,6 +6,7 @@ import com.app.promptle.game.event.*;
 import com.app.promptle.game.model.*;
 import com.app.promptle.game.repository.*;
 import com.app.promptle.image.api.ImageGenerationService;
+import com.app.promptle.image.filter.PromptFilter;
 import com.app.promptle.room.event.RoomApplicationEvent;
 import com.app.promptle.room.model.Player;
 import com.app.promptle.room.model.Room;
@@ -42,6 +43,7 @@ class GameServiceTest {
     @Mock private RoundAssignmentService roundAssignmentService;
     @Mock private TimerService timerService;
     @Mock private ImageGenerationService imageGenerationService;
+    @Mock private PromptFilter promptFilter;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     private GameService gameService;
@@ -52,6 +54,7 @@ class GameServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(promptFilter.sanitize(any())).thenAnswer(inv -> inv.getArgument(0));
         gameService = new GameService(
                 roomRepository,
                 playerRepository,
@@ -60,6 +63,7 @@ class GameServiceTest {
                 roundAssignmentService,
                 timerService,
                 imageGenerationService,
+                promptFilter,
                 eventPublisher,
                 PROMPTING_SECONDS,
                 GUESSING_SECONDS
