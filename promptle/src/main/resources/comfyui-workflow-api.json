@@ -38,7 +38,7 @@
   "7": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "text": "text, watermark",
+      "text": "text, watermark, nsfw, nude, naked, explicit, sexual, erotic, porn, pornographic, genitalia, nipples, topless, gore, gory, violence, violent, dismembered, grotesque, disturbing, offensive",
       "clip": ["4", 1]
     }
   },
