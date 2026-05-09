@@ -40,6 +40,7 @@ class GameServiceTest {
     @Mock private PlayerRepository playerRepository;
     @Mock private ChainRepository chainRepository;
     @Mock private ChainEntryRepository chainEntryRepository;
+    @Mock private ArtStyleRepository artStyleRepository;
     @Mock private RoundAssignmentService roundAssignmentService;
     @Mock private TimerService timerService;
     @Mock private ImageGenerationService imageGenerationService;
@@ -55,11 +56,13 @@ class GameServiceTest {
     @BeforeEach
     void setUp() {
         when(promptFilter.sanitize(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(artStyleRepository.findAll()).thenReturn(buildArtStyles(12));
         gameService = new GameService(
                 roomRepository,
                 playerRepository,
                 chainRepository,
                 chainEntryRepository,
+                artStyleRepository,
                 roundAssignmentService,
                 timerService,
                 imageGenerationService,
@@ -1125,6 +1128,103 @@ class GameServiceTest {
         assertEquals(GamePhase.PROMPTING, room.getPhase());
     }
 
+    // ---- startGame — chain style assignment ----
+
+    @Test
+    void startGame_AssignsUniqueStyleToEachChain() {
+        int n = 3;
+        UUID hostId = UUID.randomUUID();
+        Room room = buildRoom("ABCD1234", GamePhase.LOBBY);
+        room.setHostId(hostId);
+
+        List<Player> players = buildPlayers(n, room);
+        players.get(0).setId(hostId);
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(players);
+        when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ArgumentCaptor<Chain> chainCaptor = ArgumentCaptor.forClass(Chain.class);
+        when(chainRepository.save(chainCaptor.capture())).thenAnswer(inv -> {
+            Chain c = inv.getArgument(0);
+            c.setId(UUID.randomUUID());
+            return c;
+        });
+
+        gameService.startGame("ABCD1234", hostId);
+
+        List<Chain> saved = chainCaptor.getAllValues();
+        assertEquals(n, saved.size());
+        List<String> styles = saved.stream().map(Chain::getStyle).toList();
+        assertTrue(styles.stream().allMatch(Objects::nonNull), "Every chain must have a non-null style");
+        assertEquals(n, new HashSet<>(styles).size(), "All chain styles must be unique");
+    }
+
+    @Test
+    void startGame_ThrowsGameException_WhenNotEnoughStyles() {
+        int n = 3;
+        UUID hostId = UUID.randomUUID();
+        Room room = buildRoom("ABCD1234", GamePhase.LOBBY);
+        room.setHostId(hostId);
+
+        List<Player> players = buildPlayers(n, room);
+        players.get(0).setId(hostId);
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(players);
+        when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(artStyleRepository.findAll()).thenReturn(buildArtStyles(2)); // only 2 for 3 players
+
+        assertThrows(GameException.class, () -> gameService.startGame("ABCD1234", hostId));
+    }
+
+    // ---- triggerImageGeneration — prompt decoration ----
+
+    @Test
+    void onStartImageGeneration_DecoratesPromptWithChainStyle() {
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(1);
+        Player p = buildPlayer(UUID.randomUUID(), room);
+        Chain chain = buildChain(p, room);
+        chain.setStyle("pixel art");
+
+        ChainEntry entry = new ChainEntry();
+        entry.setText("a dragon");
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
+        when(chainEntryRepository.findByChainAndRound(chain, 1)).thenReturn(Optional.of(entry));
+        when(chainEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(imageGenerationService.generateImage(anyString()))
+                .thenReturn(CompletableFuture.completedFuture("/img/url"));
+
+        gameService.onStartImageGeneration(new StartImageGenerationEvent("ABCD1234"));
+
+        verify(imageGenerationService).generateImage("a dragon, pixel art style");
+    }
+
+    @Test
+    void onStartImageGeneration_UsesPlainPrompt_WhenChainStyleIsNull() {
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(1);
+        Player p = buildPlayer(UUID.randomUUID(), room);
+        Chain chain = buildChain(p, room); // style is null by default
+
+        ChainEntry entry = new ChainEntry();
+        entry.setText("a dragon");
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
+        when(chainEntryRepository.findByChainAndRound(chain, 1)).thenReturn(Optional.of(entry));
+        when(chainEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(imageGenerationService.generateImage(anyString()))
+                .thenReturn(CompletableFuture.completedFuture("/img/url"));
+
+        gameService.onStartImageGeneration(new StartImageGenerationEvent("ABCD1234"));
+
+        verify(imageGenerationService).generateImage("a dragon");
+    }
+
     // ---- Helpers ----
 
     private Room buildRoom(String code, GamePhase phase) {
@@ -1170,5 +1270,17 @@ class GameServiceTest {
         chain.setRoom(room);
         chain.setOriginPlayer(player);
         return chain;
+    }
+
+    private ArtStyle buildArtStyle(String name) {
+        ArtStyle s = new ArtStyle();
+        s.setName(name);
+        return s;
+    }
+
+    private List<ArtStyle> buildArtStyles(int n) {
+        return IntStream.range(0, n)
+                .mapToObj(i -> buildArtStyle("style-" + i))
+                .collect(Collectors.toList());
     }
 }
