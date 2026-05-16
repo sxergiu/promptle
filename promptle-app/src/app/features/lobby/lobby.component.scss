@@ -1,3 +1,5 @@
+@use 'breakpoints' as bp;
+
 .duplicate-overlay {
   position: fixed;
   inset: 0;
@@ -6,6 +8,7 @@
   align-items: center;
   justify-content: center;
   z-index: 100;
+  padding: 1rem;
   animation: fadeIn 0.2s ease;
 }
 
@@ -17,22 +20,24 @@
 .duplicate-dialog {
   background: var(--color-surface);
   border-radius: 16px;
-  padding: 2rem;
+  padding: 1.5rem;
   text-align: center;
   max-width: 360px;
+  width: 100%;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  @include bp.sm { padding: 2rem; }
 
   p { margin: 0 0 1.5rem; font-size: 1rem; }
 }
 
-/* ── Shell ── */
+/* -- Shell -- */
 .lobby-shell {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-/* ── Header ── */
+/* -- Header -- */
 .lobby-header {
   animation: slideDown 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -43,33 +48,36 @@
 }
 
 .lobby-title {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 800;
   margin: 0;
   color: var(--color-primary);
   position: relative;
+  @include bp.sm { font-size: 0.875rem; }
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
   position: relative;
+  @include bp.sm { gap: 0.5rem; }
 }
 
 .room-code-badge {
   font-family: 'Courier New', Courier, monospace;
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   font-weight: 800;
   color: var(--color-primary);
   background: rgba(153, 0, 48, 0.1);
   border: 1.5px solid rgba(153, 0, 48, 0.4);
   border-radius: 999px;
-  padding: 0.2rem 0.8rem;
+  padding: 0.2rem 0.6rem;
   letter-spacing: 0.12em;
   cursor: pointer;
   transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
   user-select: all;
+  @include bp.sm { font-size: 0.95rem; padding: 0.2rem 0.8rem; }
 
   &:hover {
     background: rgba(153, 0, 48, 0.18);
@@ -98,25 +106,27 @@
   &:hover { opacity: 1; }
 }
 
-/* ── Body ── */
+/* -- Body -- */
 .lobby-body {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem 1rem;
+  padding: 1.25rem 0.75rem;
   box-sizing: border-box;
-  gap: 1.5rem;
+  gap: 1.25rem;
   text-align: center;
+  @include bp.sm { padding: 2rem 1rem; gap: 1.5rem; }
 }
 
-/* ── Waiting hint ── */
+/* -- Waiting hint -- */
 .waiting-hint {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   color: var(--color-on-surface);
   opacity: 0.45;
   margin: 0;
   text-align: center;
+  @include bp.sm { font-size: 0.875rem; }
 
   &::after {
     content: '';
@@ -136,15 +146,15 @@
   100% { content: ''; }
 }
 
-/* ── Player grid ── */
+/* -- Player grid -- */
 .player-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.875rem;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
   width: 100%;
   max-width: 640px;
   animation: fadeUp 0.45s ease 0.1s both;
+  @include bp.sm { gap: 0.875rem; }
 }
 
 @keyframes fadeUp {
@@ -152,7 +162,7 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Actions ── */
+/* -- Actions -- */
 .lobby-actions {
   display: flex;
   flex-direction: column;

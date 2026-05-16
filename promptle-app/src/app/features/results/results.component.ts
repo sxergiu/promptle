@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, signal, computed, inject, effect } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal, computed, inject, effect, ElementRef, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
@@ -19,6 +19,8 @@ import { environment } from '../../../environments/environment';
   templateUrl: './results.component.html',
 })
 export class ResultsComponent implements OnInit, OnDestroy {
+  @ViewChild('entriesFeed') private entriesFeed?: ElementRef<HTMLElement>;
+
   private readonly http = inject(HttpClient);
   private readonly webSocketService = inject(WebSocketService);
   private readonly playerService = inject(PlayerService);
@@ -61,6 +63,24 @@ export class ResultsComponent implements OnInit, OnDestroy {
         this.canProceed.set(false);
       }
     });
+
+    // Auto-scroll to the latest revealed entry
+    effect(() => {
+      const count = this.revealedEntryCount();
+      if (count > 0) {
+        setTimeout(() => this.scrollToLastEntry(), 100);
+      }
+    });
+  }
+
+  private scrollToLastEntry(): void {
+    const feed = this.entriesFeed?.nativeElement;
+    if (!feed) return;
+    const entries = feed.querySelectorAll('.entry-row');
+    const last = entries[entries.length - 1];
+    if (last) {
+      last.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
   }
 
   ngOnInit(): void {

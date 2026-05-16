@@ -1,5 +1,6 @@
 @use 'bootstrap/scss/bootstrap';
 @use '@angular/material' as mat;
+@use 'app/breakpoints' as bp;
 
 html {
   @include mat.theme((
@@ -214,7 +215,8 @@ html {
 // ── Global layout ─────────────────────────────────────────────────────────────
 
 html {
-  font-size: 14px;
+  font-size: 13px;
+  @include bp.sm { font-size: 14px; }
 }
 
 html, body {
@@ -222,6 +224,7 @@ html, body {
   padding: 0;
   min-height: 100vh;
   font-family: 'Press Start 2P', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  overflow-x: hidden;
 }
 
 body {
@@ -234,6 +237,7 @@ app-root {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 // ── Global card utility ────────────────────────────────────────────────────────
@@ -255,16 +259,18 @@ app-root {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1rem;
+  padding: 1.25rem 0.75rem;
   box-sizing: border-box;
+  @include bp.sm { padding: 2rem 1rem; }
 }
 
 .page-card {
   background: var(--color-surface);
   border-radius: 20px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-  padding: 2.5rem 2rem;
+  padding: 1.5rem 1rem;
   width: 100%;
+  @include bp.sm { padding: 2.5rem 2rem; }
 }
 
 // ── Shared page header ────────────────────────────────────────────────────────
@@ -273,13 +279,14 @@ app-root {
 .page-header {
   background: linear-gradient(135deg, var(--color-accent) 0%, #3d5340 100%);
   color: var(--color-primary);
-  padding: 1.25rem 1.5rem;
+  padding: 1rem 1rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
   position: relative;
   overflow: hidden;
+  @include bp.sm { padding: 1.25rem 1.5rem; }
 
   &::before {
     content: '';
@@ -325,6 +332,20 @@ img.entry-avatar {
   }
 }
 
+// ── iOS input zoom prevention ────────────────────────────────────────────────
+// Mobile Safari zooms the viewport when input font-size < 16px.
+// Force 16px on all form inputs to prevent this.
+input, textarea, select {
+  font-size: 16px !important;
+  @include bp.sm { font-size: inherit !important; }
+}
+
+// ── Safe area insets (notch / Dynamic Island / home indicator) ───────────────
+// Applied to elements that sit at screen edges on notched iPhones.
+body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+
 // ── Angular Material overrides ─────────────────────────────────────────────────
 
 .mat-mdc-form-field {
@@ -347,9 +368,10 @@ img.entry-avatar {
 
 .theme-toggle {
   position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  right: calc(1rem + env(safe-area-inset-right));
   z-index: 1050;
+  @include bp.sm { bottom: calc(1.5rem + env(safe-area-inset-bottom)); right: calc(1.5rem + env(safe-area-inset-right)); }
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 50%;

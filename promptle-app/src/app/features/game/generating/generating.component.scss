@@ -1,14 +1,17 @@
-$cell-size: 14px;
-$cell-size-md: 12px;
+@use 'breakpoints' as bp;
+
 $cell-size-sm: 10px;
+$cell-size-md: 12px;
+$cell-size: 14px;
 
 .generating-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
-  padding: 2rem 2rem 3rem;
+  gap: 1.25rem;
+  padding: 1.25rem 1rem 2rem;
   animation: fadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  @include bp.sm { gap: 1.5rem; padding: 2rem 2rem 3rem; }
 }
 
 @keyframes fadeIn {
@@ -16,7 +19,7 @@ $cell-size-sm: 10px;
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Title ── */
+/* -- Title -- */
 .generating-title {
   font-size: 0.75rem;
   font-weight: 800;
@@ -42,7 +45,7 @@ $cell-size-sm: 10px;
   100% { content: ''; }
 }
 
-/* ── Phone float container ── */
+/* -- Phone float container -- */
 .phone-float {
   position: relative;
   animation: phoneFloat 4s ease-in-out infinite;
@@ -53,7 +56,7 @@ $cell-size-sm: 10px;
   50%      { transform: translateY(-6px); }
 }
 
-/* ── Pixel Canvas (the phone shape) ── */
+/* -- Pixel Canvas (the phone shape) -- */
 .pixel-canvas {
   display: grid;
   gap: 0px;
@@ -64,10 +67,12 @@ $cell-size-sm: 10px;
   filter: drop-shadow(3px 5px 0 rgba(0, 0, 0, 0.2));
 }
 
-/* ── Pixel Cells ── */
+/* -- Pixel Cells -- mobile-first: smallest size, scale up -- */
 .pixel-cell {
-  width: $cell-size;
-  height: $cell-size;
+  width: $cell-size-sm;
+  height: $cell-size-sm;
+  @include bp.sm { width: $cell-size-md; height: $cell-size-md; }
+  @include bp.md { width: $cell-size; height: $cell-size; }
 
   &--empty {
     pointer-events: none;
@@ -118,13 +123,13 @@ $cell-size-sm: 10px;
   }
 }
 
-/* ── Phone icon breathing pulse ── */
+/* -- Phone icon breathing pulse -- */
 @keyframes phonePulse {
   0%, 100% { filter: brightness(1); }
   50%      { filter: brightness(1.3); }
 }
 
-/* ── Phone icon ring/shake ── */
+/* -- Phone icon ring/shake -- */
 @keyframes phoneRing {
   0%       { transform: rotate(0deg); }
   10%      { transform: rotate(-8deg) scale(1.1); }
@@ -138,14 +143,14 @@ $cell-size-sm: 10px;
   100%     { transform: rotate(0deg) scale(1); }
 }
 
-/* ── Screen cell pop ── */
+/* -- Screen cell pop -- */
 @keyframes popBurst {
   0%   { transform: scale(1); }
   40%  { transform: scale(1.4); filter: brightness(1.5); }
   100% { transform: scale(1); filter: brightness(1); }
 }
 
-/* ── Heartbeat — double brightness pulse on all screen cells ── */
+/* -- Heartbeat -- */
 .pixel-canvas.heartbeating .pixel-cell--screen {
   animation: heartbeat 0.8s ease-in-out !important;
 }
@@ -159,7 +164,7 @@ $cell-size-sm: 10px;
   100% { filter: brightness(1); }
 }
 
-/* ── Particles ── */
+/* -- Particles -- */
 .particle {
   position: absolute;
   width: 5px;
@@ -180,39 +185,20 @@ $cell-size-sm: 10px;
   }
 }
 
-/* ── Rotating Message ── */
+/* -- Rotating Message -- */
 .generating-message {
   font-size: 0.6rem;
   color: var(--color-on-surface);
   opacity: 0;
   margin: 0;
   text-align: center;
-  max-width: 320px;
+  max-width: 260px;
   line-height: 2;
   transition: opacity 0.4s ease;
   min-height: 2.4em;
+  @include bp.sm { max-width: 320px; }
 
   &.visible {
     opacity: 0.6;
-  }
-}
-
-/* ── Responsive ── */
-@media (max-width: 767px) {
-  .pixel-cell {
-    width: $cell-size-md;
-    height: $cell-size-md;
-  }
-}
-
-@media (max-width: 399px) {
-  .pixel-cell {
-    width: $cell-size-sm;
-    height: $cell-size-sm;
-  }
-
-  .generating-message {
-    font-size: 0.55rem;
-    max-width: 260px;
   }
 }

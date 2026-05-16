@@ -17,7 +17,7 @@
         }
       </div>
 
-      <div class="entries-feed">
+      <div class="entries-feed" #entriesFeed>
         @for (chain of chains(); track $index) {
           @if ($index === currentChainIndex()) {
             @for (entry of chain.entries; track $index; let i = $index) {
