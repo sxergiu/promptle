@@ -6,6 +6,7 @@ import com.app.promptle.game.event.*;
 import com.app.promptle.game.model.*;
 import com.app.promptle.game.repository.*;
 import com.app.promptle.image.api.ImageGenerationService;
+import com.app.promptle.image.api.ImageStorageService;
 import com.app.promptle.image.filter.PromptFilter;
 import com.app.promptle.room.event.RoomApplicationEvent;
 import com.app.promptle.room.model.Player;
@@ -44,6 +45,7 @@ class GameServiceTest {
     @Mock private RoundAssignmentService roundAssignmentService;
     @Mock private TimerService timerService;
     @Mock private ImageGenerationService imageGenerationService;
+    @Mock private ImageStorageService imageStorageService;
     @Mock private PromptFilter promptFilter;
     @Mock private ApplicationEventPublisher eventPublisher;
 
@@ -66,6 +68,7 @@ class GameServiceTest {
                 roundAssignmentService,
                 timerService,
                 imageGenerationService,
+                imageStorageService,
                 promptFilter,
                 eventPublisher,
                 PROMPTING_SECONDS,
@@ -1223,6 +1226,94 @@ class GameServiceTest {
         gameService.onStartImageGeneration(new StartImageGenerationEvent("ABCD1234"));
 
         verify(imageGenerationService).generateImage("a dragon");
+    }
+
+    // ---- triggerImageGeneration — img2img ----
+
+    @Test
+    void triggerImageGeneration_UsesTxt2img_ForRound1() {
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(1);
+        Player p = buildPlayer(UUID.randomUUID(), room);
+        Chain chain = buildChain(p, room);
+
+        ChainEntry entry = new ChainEntry();
+        entry.setText("a sunset");
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
+        when(chainEntryRepository.findByChainAndRound(chain, 1)).thenReturn(Optional.of(entry));
+        when(chainEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(imageGenerationService.generateImage(anyString()))
+                .thenReturn(CompletableFuture.completedFuture("/img/url"));
+
+        gameService.onStartImageGeneration(new StartImageGenerationEvent("ABCD1234"));
+
+        verify(imageGenerationService).generateImage(anyString());
+        verify(imageGenerationService, never()).generateImageFromImage(anyString(), any(byte[].class));
+    }
+
+    @Test
+    void triggerImageGeneration_UsesImg2img_ForRound2_WhenPreviousImageExists() {
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(2);
+        Player p = buildPlayer(UUID.randomUUID(), room);
+        Chain chain = buildChain(p, room);
+
+        // Current round entry (round 2)
+        ChainEntry currentEntry = new ChainEntry();
+        currentEntry.setText("a cat on a mountain");
+
+        // Previous round entry (round 1) with an image
+        ChainEntry prevEntry = new ChainEntry();
+        prevEntry.setImageUrl("/api/images/game-abc/prev-img");
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
+        when(chainEntryRepository.findByChainAndRound(chain, 2)).thenReturn(Optional.of(currentEntry));
+        when(chainEntryRepository.findByChainAndRound(chain, 1)).thenReturn(Optional.of(prevEntry));
+        when(chainEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(imageStorageService.fetchImageBytes("/api/images/game-abc/prev-img"))
+                .thenReturn(new byte[]{1, 2, 3});
+        when(imageGenerationService.generateImageFromImage(anyString(), any(byte[].class)))
+                .thenReturn(CompletableFuture.completedFuture("/img/img2img-url"));
+
+        gameService.onStartImageGeneration(new StartImageGenerationEvent("ABCD1234"));
+
+        verify(imageGenerationService).generateImageFromImage(anyString(), any(byte[].class));
+        verify(imageStorageService).fetchImageBytes("/api/images/game-abc/prev-img");
+    }
+
+    @Test
+    void triggerImageGeneration_FallsBackToTxt2img_WhenPreviousImageFetchFails() {
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(2);
+        Player p = buildPlayer(UUID.randomUUID(), room);
+        Chain chain = buildChain(p, room);
+
+        // Current round entry (round 2)
+        ChainEntry currentEntry = new ChainEntry();
+        currentEntry.setText("a dog in space");
+
+        // Previous round entry (round 1) with an image URL
+        ChainEntry prevEntry = new ChainEntry();
+        prevEntry.setImageUrl("/api/images/game-abc/prev-img");
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
+        when(chainEntryRepository.findByChainAndRound(chain, 2)).thenReturn(Optional.of(currentEntry));
+        when(chainEntryRepository.findByChainAndRound(chain, 1)).thenReturn(Optional.of(prevEntry));
+        when(chainEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(imageStorageService.fetchImageBytes("/api/images/game-abc/prev-img"))
+                .thenThrow(new RuntimeException("File not found"));
+        when(imageGenerationService.generateImage(anyString()))
+                .thenReturn(CompletableFuture.completedFuture("/img/fallback-url"));
+
+        gameService.onStartImageGeneration(new StartImageGenerationEvent("ABCD1234"));
+
+        // Should fall back to txt2img
+        verify(imageGenerationService).generateImage(anyString());
+        verify(imageGenerationService, never()).generateImageFromImage(anyString(), any(byte[].class));
     }
 
     // ---- Helpers ----

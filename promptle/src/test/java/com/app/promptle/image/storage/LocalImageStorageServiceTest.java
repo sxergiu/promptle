@@ -72,4 +72,21 @@ class LocalImageStorageServiceTest {
     void deleteGame_Idempotent_DoesNotThrowWhenDirectoryAbsent() {
         assertDoesNotThrow(() -> service.deleteGame("nonexistent-game"));
     }
+
+    // ---- fetchImageBytes ----
+
+    @Test
+    void fetchImageBytes_ReturnsCorrectBytes() {
+        byte[] bytes = "test-image-data".getBytes();
+        service.store("game-abc", "img-001", bytes);
+
+        byte[] result = service.fetchImageBytes("/api/images/game-abc/img-001");
+        assertArrayEquals(bytes, result);
+    }
+
+    @Test
+    void fetchImageBytes_ThrowsWhenImageNotFound() {
+        assertThrows(RuntimeException.class,
+            () -> service.fetchImageBytes("/api/images/nonexistent/missing"));
+    }
 }

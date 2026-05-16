@@ -6,6 +6,7 @@ import com.app.promptle.game.event.*;
 import com.app.promptle.game.model.*;
 import com.app.promptle.game.repository.*;
 import com.app.promptle.image.api.ImageGenerationService;
+import com.app.promptle.image.api.ImageStorageService;
 import com.app.promptle.image.filter.PromptFilter;
 import com.app.promptle.room.dto.PlayerDto;
 import com.app.promptle.room.dto.RoomEvent;
@@ -45,6 +46,7 @@ public class GameService {
     private final RoundAssignmentService roundAssignmentService;
     private final TimerService timerService;
     private final ImageGenerationService imageGenerationService;
+    private final ImageStorageService imageStorageService;
     private final PromptFilter promptFilter;
     private final ApplicationEventPublisher eventPublisher;
     private final long promptingSeconds;
@@ -61,6 +63,7 @@ public class GameService {
                        RoundAssignmentService roundAssignmentService,
                        TimerService timerService,
                        ImageGenerationService imageGenerationService,
+                       ImageStorageService imageStorageService,
                        PromptFilter promptFilter,
                        ApplicationEventPublisher eventPublisher,
                        @Value("${game.timer.prompting-seconds:60}") long promptingSeconds,
@@ -73,6 +76,7 @@ public class GameService {
         this.roundAssignmentService = roundAssignmentService;
         this.timerService = timerService;
         this.imageGenerationService = imageGenerationService;
+        this.imageStorageService = imageStorageService;
         this.promptFilter = promptFilter;
         this.eventPublisher = eventPublisher;
         this.promptingSeconds = promptingSeconds;
@@ -367,7 +371,26 @@ public class GameService {
                             }
                             String style = chain.getStyle();
                             String decorated = entry.getText() + (style != null && !style.isBlank() ? ", " + style + " style" : "");
-                            return imageGenerationService.generateImage(decorated)
+
+                            byte[] previousImageBytes = null;
+                            if (room.getCurrentRound() > 1) {
+                                ChainEntry prevEntry = chainEntryRepository
+                                        .findByChainAndRound(chain, room.getCurrentRound() - 1)
+                                        .orElse(null);
+                                if (prevEntry != null && prevEntry.getImageUrl() != null) {
+                                    try {
+                                        previousImageBytes = imageStorageService
+                                                .fetchImageBytes(prevEntry.getImageUrl());
+                                    } catch (Exception e) {
+                                        log.warn("Failed to fetch previous image for img2img, falling back to txt2img: {}", e.getMessage());
+                                    }
+                                }
+                            }
+
+                            CompletableFuture<String> future = (previousImageBytes != null)
+                                    ? imageGenerationService.generateImageFromImage(decorated, previousImageBytes)
+                                    : imageGenerationService.generateImage(decorated);
+                            return future
                                     .thenAccept(imageUrl -> {
                                         entry.setImageUrl(imageUrl);
                                         chainEntryRepository.save(entry);

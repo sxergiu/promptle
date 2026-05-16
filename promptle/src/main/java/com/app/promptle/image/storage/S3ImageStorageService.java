@@ -30,4 +30,9 @@ public class S3ImageStorageService implements ImageStorageService {
     public void deleteImages(List<String> urls) {
         throw new UnsupportedOperationException("S3 storage not yet implemented");
     }
+
+    @Override
+    public byte[] fetchImageBytes(String imageUrl) {
+        throw new UnsupportedOperationException("S3 storage not yet implemented");
+    }
 }

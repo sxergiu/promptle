@@ -3,6 +3,7 @@ package com.app.promptle.game.service;
 import com.app.promptle.game.model.*;
 import com.app.promptle.game.repository.*;
 import com.app.promptle.image.api.ImageGenerationService;
+import com.app.promptle.image.api.ImageStorageService;
 import com.app.promptle.image.filter.PromptFilter;
 import com.app.promptle.room.model.Player;
 import com.app.promptle.room.model.Room;
@@ -46,6 +47,7 @@ class ConcurrentSubmissionTest {
     @Mock private RoundAssignmentService roundAssignmentService;
     @Mock private TimerService timerService;
     @Mock private ImageGenerationService imageGenerationService;
+    @Mock private ImageStorageService imageStorageService;
     @Mock private PromptFilter promptFilter;
     @Mock private ApplicationEventPublisher eventPublisher;
 
@@ -66,6 +68,7 @@ class ConcurrentSubmissionTest {
                 roundAssignmentService,
                 timerService,
                 imageGenerationService,
+                imageStorageService,
                 promptFilter,
                 eventPublisher,
                 PROMPTING_SECONDS,

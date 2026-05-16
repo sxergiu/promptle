@@ -14,4 +14,8 @@ public interface ImageGenerationService {
      * @return a CompletableFuture that resolves to the image URL
      */
     CompletableFuture<String> generateImage(String prompt);
+
+    default CompletableFuture<String> generateImageFromImage(String prompt, byte[] previousImageBytes) {
+        return generateImage(prompt);
+    }
 }
