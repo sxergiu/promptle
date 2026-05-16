@@ -29,4 +29,6 @@ public interface ImageStorageService {
      * @param urls list of URL paths returned by {@link #store}
      */
     void deleteImages(java.util.List<String> urls);
+
+    byte[] fetchImageBytes(String imageUrl);
 }
