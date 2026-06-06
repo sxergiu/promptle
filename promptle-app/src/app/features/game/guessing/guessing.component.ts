@@ -1,11 +1,10 @@
 import { Component, Input, OnChanges, OnInit, signal, SimpleChanges } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { WebSocketService } from '../../../core/services/websocket.service';
 
 @Component({
   selector: 'app-guessing',
   standalone: true,
-  imports: [MatButtonModule],
+  imports: [],
   styleUrl: './guessing.component.scss',
   templateUrl: './guessing.component.html',
 })

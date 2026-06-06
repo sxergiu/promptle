@@ -246,7 +246,6 @@ export class GeneratingComponent implements OnInit, OnDestroy {
     const screenIndices = getScreenCellIndices();
     let colorIdx = 0;
     const iv = setInterval(() => {
-      const color = DISCO_COLORS[colorIdx % DISCO_COLORS.length];
       const updated = [...this.cells()];
       for (const si of screenIndices) {
         // Alternate between 2 colors in a checkerboard
