@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Stub — fully implemented in later chunks (Chunk 4, 8, 9, 12).
  * Broadcasts Spring application events as WebSocket messages.
  */
 @Component

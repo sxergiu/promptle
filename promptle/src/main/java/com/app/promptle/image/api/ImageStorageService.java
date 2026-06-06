@@ -1,7 +1,7 @@
 package com.app.promptle.image.api;
 
 /**
- * Stub interface — fully implemented in a later chunk.
+ * Stores generated images and retrieves them (e.g. to seed image-to-image rounds).
  */
 public interface ImageStorageService {
 
@@ -30,5 +30,11 @@ public interface ImageStorageService {
      */
     void deleteImages(java.util.List<String> urls);
 
+    /**
+     * Fetches the raw bytes of a previously stored image, used to seed image-to-image rounds.
+     *
+     * @param imageUrl URL path returned by {@link #store}
+     * @return raw image bytes
+     */
     byte[] fetchImageBytes(String imageUrl);
 }
