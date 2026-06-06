@@ -1,19 +1,27 @@
-<div class="player-card">
-  <img [src]="avatarPath" [alt]="alias" class="player-avatar" />
-
-  <div class="player-info">
-    <div class="player-name-row">
-      @if (isHost) {
-        <span class="crown" aria-label="Host">&#x1F451;</span>
-      }
-      <span class="player-alias">{{ alias }}</span>
+@if (empty) {
+  <div class="player-card player-card--empty">
+    <div class="empty-avatar"></div>
+    <div class="player-info">
+      <span class="empty-label">?</span>
     </div>
-    @if (isCurrentPlayer) {
-      <span class="me-label">you</span>
+  </div>
+} @else {
+  <div class="player-card">
+    <img [src]="avatarPath" [alt]="alias" class="player-avatar" />
+
+    <div class="player-info">
+      <div class="player-name-row">
+        @if (isHost) {
+          <img src="app-icons/promptle-crown.svg" alt="Host" class="crown" />
+        }
+        <span class="player-alias">{{ alias }}</span>
+      </div>
+    </div>
+
+    @if (showKickButton) {
+      <button type="button" class="kick-btn" aria-label="Kick player">
+        <img src="app-icons/promptle-leave.svg" class="btn-icon" alt="" />
+      </button>
     }
   </div>
-
-  @if (showKickButton) {
-    <button type="button" class="kick-btn" aria-label="Kick player">Kick</button>
-  }
-</div>
+}
