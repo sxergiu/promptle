@@ -8,7 +8,7 @@
 
 Each player writes a prompt → an AI generates an image → the next player guesses the original prompt from that image → repeat until the chain completes. At the end, everyone watches the full chain revealed entry by entry.
 
-- **2–8 players**, fully synchronous
+- **1–8 players** (single-player supported), fully synchronous
 - **Server-authoritative timer** — rounds end for everyone simultaneously
 - **No score** — the entertainment is watching the chain collapse
 
@@ -34,6 +34,8 @@ cd promptle-app && npm install && ng serve
 
 Default config uses a stub image generator. Set `image.generation.provider=comfyui` in `application.properties` to use real AI images.
 
+> **New here?** Full setup, architecture, and a docs map: [`promptle-docs/getting-started.md`](promptle-docs/getting-started.md) · [`promptle-docs/README.md`](promptle-docs/README.md).
+
 ---
 
 ## LAN Deployment (Docker + ComfyUI)
@@ -44,7 +46,7 @@ Play with friends on the same Wi-Fi using real AI-generated images.
 
 ```bash
 # 1. Start ComfyUI
-./start-comfyui.sh
+./scripts/start-comfyui.sh
 
 # 2. Start the app
 docker compose build && docker compose up -d
