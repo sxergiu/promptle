@@ -55,7 +55,7 @@ public class ComfyUIGenerationService implements ImageGenerationService {
     public ComfyUIGenerationService(ImageStorageService imageStorageService,
                                     ObjectMapper objectMapper,
                                     @Value("${image.generation.comfyui.url:http://localhost:8188}") String comfyUiUrl,
-                                    @Value("${image.generation.comfyui.workflow:comfyui-workflow-api.json}") String workflowResource,
+                                    @Value("${image.generation.comfyui.workflow:workflows/proto-t2i.json}") String workflowResource,
                                     @Value("${image.generation.comfyui.prompt-node-id:6}") String promptNodeId,
                                     @Value("${image.generation.comfyui.output-node-id:9}") String outputNodeId,
                                     @Value("${image.generation.comfyui.img2img-workflow:#{null}}") String img2imgWorkflowResource,
