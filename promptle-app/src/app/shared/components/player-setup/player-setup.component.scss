@@ -1,0 +1,202 @@
+@use 'breakpoints' as bp;
+
+.setup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  @include bp.sm { padding: 3rem 2rem; }
+  @include bp.landscape { padding: 1rem; gap: 1rem; }
+}
+
+/* -- Brand -- */
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.logo {
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin: 0;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  @include bp.sm { font-size: 2.6rem; }
+  @include bp.landscape { font-size: 1.6rem; }
+
+  .letter-green { color: var(--p-green); }
+  .letter-red { color: var(--color-primary); }
+}
+
+.tagline {
+  font-size: 0.75rem;
+  margin: 0;
+  color: var(--color-on-surface);
+  opacity: 0.5;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+/* -- Identity row (big avatar left, name + play stacked right) -- */
+.identity-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 1.1rem;
+  width: 100%;
+  max-width: 22rem;
+  @include bp.landscape { gap: 0.85rem; }
+}
+
+.identity-fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.avatar-section {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.avatar-img {
+  display: block;
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 65%;
+  // Border matches the avatar background (warm near-white in light, dark gray in
+  // dark) so the disc reads as one clean token.
+  border: 3px solid var(--avatar-bg);
+  background: var(--avatar-bg);
+  @include bp.sm { width: 128px; height: 128px; }
+  @include bp.landscape { width: 76px; height: 76px; }
+}
+
+.shuffle-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  cursor: pointer;
+  padding: 8px;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+
+  @media (hover: hover) {
+    &:hover { transform: scale(1.1); }
+  }
+}
+
+.dice-icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+
+  &.spinning { animation: dice-roll 0.25s linear infinite; }
+}
+
+@keyframes dice-roll {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* -- Name input (native, pixel-bordered to match the app) -- */
+.name-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: left;
+  color: var(--color-on-surface);
+  background: var(--tv-screen-bg, var(--color-surface));
+  border: 2px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+
+  &::placeholder {
+    color: var(--color-on-surface);
+    opacity: 0.4;
+    font-weight: 500;
+  }
+
+  &:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  }
+
+  &.rejected {
+    border-color: var(--color-danger);
+    animation: inputShake 0.4s;
+  }
+}
+
+@keyframes inputShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+/* -- Error -- */
+.error-message {
+  color: var(--color-danger);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.6rem 0.875rem;
+  background: var(--color-danger-bg);
+  border-left: 3px solid var(--color-danger);
+  border-radius: 4px;
+  animation: fadeIn 0.3s ease;
+  word-break: break-word;
+  max-width: 17rem;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* -- Play button — visual chrome from global .btn-cta; only layout here -- */
+.btn-play {
+  width: 100%;
+}
+
+/* -- Footer -- */
+.setup-footer {
+  padding-top: 8px;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  @include bp.sm { padding-top: 10px; }
+  @include bp.landscape { gap: 0.5rem; }
+}
+
+.footer-link {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.25);
+  text-decoration: none;
+  transition: color 0.2s;
+  @include bp.sm { font-size: 0.7rem; }
+  @media (hover: hover) {
+    &:hover { color: rgba(255, 255, 255, 0.5); }
+  }
+}

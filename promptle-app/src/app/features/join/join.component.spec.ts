@@ -14,6 +14,7 @@ describe('JoinComponent', () => {
   let routerSpy: jasmine.SpyObj<Router>;
 
   const ROOM_CODE = 'TEST1234';
+  const SUBMIT = { alias: 'Bob', avatarId: 'icon-2' };
 
   beforeEach(async () => {
     roomApiSpy = jasmine.createSpyObj('RoomApiService', ['joinRoom']);
@@ -44,92 +45,65 @@ describe('JoinComponent', () => {
     fixture.detectChanges();
   });
 
-  // ---- Initial render ----
-
-  it('reads roomCode from ActivatedRoute.params on init', () => {
+  it('reads roomCode from the route on init', () => {
     expect(component.roomCode).toBe(ROOM_CODE);
   });
 
-  it('does not render the room code as visible text in the template', () => {
+  it('redirects straight to the lobby if the player is already in this room', () => {
+    playerServiceSpy.loadFromLocalStorage.and.returnValue({
+      playerToken: 'tok', playerId: 'pid', alias: 'Bob', avatarId: 'icon-2',
+    });
+    const fresh = TestBed.createComponent(JoinComponent);
+    fresh.detectChanges();
+    expect(routerSpy.navigate).toHaveBeenCalledWith(['/lobby', ROOM_CODE]);
+  });
+
+  it('does not render the room code as visible text', () => {
     const compiled = fixture.nativeElement as HTMLElement;
-    // Room code may appear in hidden inputs but should not be prominently displayed
-    const text = compiled.textContent ?? '';
-    // The room code should not appear as standalone visible text
-    // We check it's not in a heading or label
     const headings = Array.from(compiled.querySelectorAll('h1, h2, h3, label, p'))
       .map(el => el.textContent ?? '');
-    const headingContainsCode = headings.some(t => t.includes(ROOM_CODE));
-    expect(headingContainsCode).toBeFalse();
+    expect(headings.some(t => t.includes(ROOM_CODE))).toBeFalse();
   });
 
-  it('displays the Promptle logo', () => {
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('Promptle');
+  it('calls joinRoom with the route room code and submitted player', () => {
+    roomApiSpy.joinRoom.and.returnValue(of({ playerToken: 'tok', roomCode: ROOM_CODE, playerId: 'pid' }));
+
+    component.onJoinRoom(SUBMIT);
+
+    expect(roomApiSpy.joinRoom).toHaveBeenCalledWith(ROOM_CODE, 'Bob', 'icon-2');
   });
 
-  it('displays The AI Telephone tagline', () => {
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('The AI Telephone');
-  });
+  it('saves to localStorage and navigates to the lobby on success', () => {
+    roomApiSpy.joinRoom.and.returnValue(of({ playerToken: 'tok-abc', roomCode: ROOM_CODE, playerId: 'pid-xyz' }));
 
-  // ---- "Continue to Room" button ----
-
-  it('calls RoomApiService.joinRoom with room code from route', () => {
-    roomApiSpy.joinRoom.and.returnValue(of({
-      playerToken: 'tok',
-      roomCode: ROOM_CODE,
-      playerId: 'pid',
-    }));
-    playerServiceSpy.saveToLocalStorage.and.stub();
-    routerSpy.navigate.and.stub();
-
-    component.alias.set('Bob');
-    component.onJoinRoom();
-
-    expect(roomApiSpy.joinRoom).toHaveBeenCalledWith(
-      ROOM_CODE,
-      'Bob',
-      jasmine.any(String)
-    );
-  });
-
-  it('saves to localStorage and navigates to /lobby/{roomCode} on success', () => {
-    roomApiSpy.joinRoom.and.returnValue(of({
-      playerToken: 'tok-abc',
-      roomCode: ROOM_CODE,
-      playerId: 'pid-xyz',
-    }));
-    playerServiceSpy.saveToLocalStorage.and.stub();
-    routerSpy.navigate.and.stub();
-
-    component.alias.set('Bob');
-    component.onJoinRoom();
+    component.onJoinRoom(SUBMIT);
 
     expect(playerServiceSpy.saveToLocalStorage).toHaveBeenCalled();
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/lobby', ROOM_CODE]);
   });
 
-  it('displays "Room is full" error when API returns 409 with "full" message', () => {
-    const errorResponse = { status: 409, error: { error: 'Room is full' } };
-    roomApiSpy.joinRoom.and.returnValue(throwError(() => errorResponse));
+  it('shows "Room is full" when the API reports a full room', () => {
+    roomApiSpy.joinRoom.and.returnValue(throwError(() => ({ status: 409, error: { error: 'Room is full' } })));
 
-    component.alias.set('Bob');
-    component.onJoinRoom();
-    fixture.detectChanges();
+    component.onJoinRoom(SUBMIT);
 
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('full');
+    expect(component.errorMessage()).toBe('Room is full');
   });
 
-  it('displays "Game already in progress" error when API returns 409 with "in progress" message', () => {
-    const errorResponse = { status: 409, error: { error: 'Game already in progress' } };
-    roomApiSpy.joinRoom.and.returnValue(throwError(() => errorResponse));
+  it('shows "Game already in progress" when the API reports it', () => {
+    roomApiSpy.joinRoom.and.returnValue(throwError(() => ({ status: 409, error: { error: 'Game already in progress' } })));
 
-    component.alias.set('Bob');
-    component.onJoinRoom();
-    fixture.detectChanges();
+    component.onJoinRoom(SUBMIT);
 
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('progress');
+    expect(component.errorMessage()).toBe('Game already in progress');
+  });
+
+  it('clears busy state after an error so the player can retry', () => {
+    roomApiSpy.joinRoom.and.returnValue(throwError(() => ({ status: 500, error: {} })));
+
+    component.onJoinRoom(SUBMIT);
+
+    expect(component.busy()).toBeFalse();
+    expect(component.errorMessage()).toBe('An error occurred. Please try again.');
   });
 });
