@@ -2,54 +2,67 @@
   <div class="duplicate-overlay">
     <div class="duplicate-dialog">
       <p>You already have this lobby open in another tab.</p>
-      <button type="button" mat-button (click)="exitLobby()">Go to Home</button>
+      <button type="button" class="btn-secondary" (click)="exitLobby()">Go to Home</button>
     </div>
   </div>
 }
 
-<div class="lobby-shell">
-  <header class="lobby-header page-header">
-    <h1 class="lobby-title">Lobby</h1>
-    <div class="header-right">
-      <span class="room-code-badge">{{ roomCode }}</span>
-      <button class="settings-btn" type="button" mat-icon-button aria-label="Settings">
-        <mat-icon>settings</mat-icon>
-      </button>
+<div class="screen-shell">
+  <div class="tv-frame">
+    <div class="tv-screen">
+      <div class="lobby-content">
+        <!-- Player count header -->
+        <div class="lobby-top-bar">
+          <p class="player-area-title">Players {{ players().length }}/8</p>
+        </div>
+
+        <!-- Player grid -->
+        <div class="player-area">
+          <div class="player-list">
+            @for (player of players(); track player.id) {
+              <app-player-card
+                [alias]="player.alias"
+                [avatarId]="player.avatarId"
+                [isHost]="player.id === hostId()"
+                [isCurrentPlayer]="player.id === playerId"
+                size="large"
+              />
+            }
+            @for (slot of emptySlots(); track $index) {
+              <app-player-card [empty]="true" size="large" />
+            }
+          </div>
+        </div>
+
+        <!-- CTA buttons -->
+        <div class="lobby-cta">
+          @if (waitingForResults()) {
+            <p class="lobby-waiting-note">Waiting for players to finish viewing results…</p>
+          }
+          <div class="lobby-cta-row">
+            <button type="button" class="btn-secondary btn-leave" (click)="exitLobby()">
+              <img src="app-icons/promptle-leave.svg" class="btn-icon" alt="" />
+              LEAVE
+            </button>
+            <button type="button" class="btn-secondary btn-invite" [class.copied]="copied()" (click)="inviteOthers()">
+              <img src="app-icons/promptle-copy.svg" class="btn-icon icon-ring" alt="" />
+              {{ copied() ? 'COPIED!' : 'INVITE' }}
+            </button>
+            @if (isHost()) {
+              <button
+                type="button"
+                class="btn-cta btn-start"
+                [disabled]="players().length < 1 || starting() || waitingForResults()"
+                (click)="startGame()"
+              >
+                <img src="app-icons/promptle-play.svg" class="btn-icon" alt="" />
+                START
+              </button>
+            }
+          </div>
+        </div>
+      </div>
     </div>
-  </header>
-
-  <div class="lobby-body">
-    <p class="waiting-hint">{{ players().length }} / 8 players · waiting for host to start</p>
-
-    <div class="player-list">
-      @for (player of players(); track player.id) {
-        <app-player-card
-          [alias]="player.alias"
-          [avatarId]="player.avatarId"
-          [isHost]="player.id === hostId()"
-          [isCurrentPlayer]="player.id === playerId"
-        />
-      }
-    </div>
-
-    <div class="lobby-actions">
-      @if (isHost()) {
-        <button type="button" mat-raised-button class="btn-green" (click)="inviteOthers()">
-          {{ copied() ? 'Copied!' : 'Copy Invite Link' }}
-        </button>
-      }
-
-      <button
-        type="button"
-        mat-raised-button
-        color="primary"
-        [disabled]="!isHost() || players().length < 2 || starting()"
-        (click)="startGame()"
-      >
-        {{ isHost() ? 'Start Game' : 'Waiting for host…' }}
-      </button>
-
-      <button type="button" mat-button (click)="exitLobby()">Leave Lobby</button>
-    </div>
+    <div class="tv-label">Lobby</div>
   </div>
 </div>

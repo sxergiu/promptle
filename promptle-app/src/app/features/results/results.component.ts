@@ -1,8 +1,7 @@
 import { Component, OnDestroy, OnInit, signal, computed, inject, effect, ElementRef, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
+
 import { WebSocketService } from '../../core/services/websocket.service';
 import { PlayerService } from '../../core/services/player.service';
 import { RoomApiService } from '../../core/services/room-api.service';
@@ -10,11 +9,12 @@ import { ChainDto, RoomEvent, ShowcaseAdvancedEvent } from '../../core/models/ev
 import { PlayerDto } from '../../core/models/player.model';
 import { PLAYER_ICONS } from '../../core/models/player-icons';
 import { environment } from '../../../environments/environment';
+import { StompSubscription } from '@stomp/stompjs';
 
 @Component({
   selector: 'app-results',
   standalone: true,
-  imports: [MatButtonModule, MatIconModule],
+  imports: [],
   styleUrl: './results.component.scss',
   templateUrl: './results.component.html',
 })
@@ -41,9 +41,15 @@ export class ResultsComponent implements OnInit, OnDestroy {
 
   readonly revealIntervalMs: number = environment.showcaseRevealIntervalMs;
 
-  private _intervalId: any = null;
-  private _proceedTimer: any = null;
+  private _intervalId: ReturnType<typeof setInterval> | null = null;
+  private _proceedTimer: ReturnType<typeof setTimeout> | null = null;
   private _roomCode = '';
+  private _subs: StompSubscription[] = [];
+  // True once we're leaving the showcase for the lobby. The live WebSocket must be
+  // kept alive across this navigation so the lobby can reuse it — tearing it down
+  // would briefly mark the player disconnected, which corrupts the "waiting for
+  // players" reset bookkeeping (ghost-player deletion / missed GAME_RESET).
+  private navigatingToLobby = false;
 
   readonly allRevealed = computed(() => {
     const chain = this.chains()[this.currentChainIndex()];
@@ -102,7 +108,7 @@ export class ResultsComponent implements OnInit, OnDestroy {
     }
 
     const subscribeToTopics = () => {
-      this.webSocketService.subscribe(`/topic/game/${this._roomCode}`, (msg: unknown) => {
+      this._subs.push(this.webSocketService.subscribe(`/topic/game/${this._roomCode}`, (msg: unknown) => {
         const event = msg as ShowcaseAdvancedEvent;
         if (event && typeof event.chainIndex === 'number') {
           this.canProceed.set(false);
@@ -110,14 +116,15 @@ export class ResultsComponent implements OnInit, OnDestroy {
           this.revealedEntryCount.set(0);
           this.startRevealInterval();
         }
-      });
+      }));
 
-      this.webSocketService.subscribe(`/topic/room/${this._roomCode}`, (msg: unknown) => {
+      this._subs.push(this.webSocketService.subscribe(`/topic/room/${this._roomCode}`, (msg: unknown) => {
         const event = msg as RoomEvent;
         if (event?.type === 'GAME_RESET') {
+          this.navigatingToLobby = true;
           this.router.navigate(['/lobby', this._roomCode]);
         }
-      });
+      }));
     };
 
     // Reuse the live connection kept by GameComponent; only reconnect on direct navigation / refresh
@@ -163,10 +170,12 @@ export class ResultsComponent implements OnInit, OnDestroy {
   }
 
   onBackToLobby(): void {
+    // Per-player return: tell the server this player has left the showcase, then
+    // navigate locally. The room itself only resets once everyone has returned.
     const token = this.playerService.loadFromLocalStorage(this._roomCode)?.playerToken ?? '';
-    this.roomApiService.resetGame(this._roomCode, token).subscribe({
-      error: () => this.router.navigate(['/lobby', this._roomCode])
-    });
+    this.roomApiService.leaveResults(this._roomCode, token).subscribe({ error: () => {} });
+    this.navigatingToLobby = true;
+    this.router.navigate(['/lobby', this._roomCode]);
   }
 
   onExportThread(): void {
@@ -202,7 +211,13 @@ export class ResultsComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this._clearInterval();
     if (this._proceedTimer) clearTimeout(this._proceedTimer);
-    this.webSocketService.disconnect();
+    // Drop our own topic subscriptions so their callbacks don't fire on the dead
+    // component, but keep the socket open when handing off to the lobby.
+    this._subs.forEach(sub => sub.unsubscribe());
+    this._subs = [];
+    if (!this.navigatingToLobby) {
+      this.webSocketService.disconnect();
+    }
   }
 
   private _clearInterval(): void {

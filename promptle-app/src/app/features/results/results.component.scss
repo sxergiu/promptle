@@ -1,52 +1,61 @@
 @use 'breakpoints' as bp;
 
-:host { display: flex; flex-direction: column; min-height: 100vh; }
-
-.results-shell {
+/* -- Layout -- */
+.results-content {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  background: var(--color-surface);
+  height: 100%;
+  min-height: 0;
 }
 
-/* -- Header -- */
+/* -- Chain count title (centered on the bezel, above the screen) -- */
 .results-header {
-  padding: 1rem;
-  @include bp.sm { padding: 1.5rem 1.5rem 1.75rem; }
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 4px 8px;
 }
 
-.results-title {
-  font-size: 0.75rem;
-  font-weight: 900;
-  margin: 0;
-  letter-spacing: 0.04em;
-  position: relative;
-  @include bp.sm { font-size: 0.875rem; }
+.tv-frame--tall {
+  @include bp.md { max-width: 720px; }
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+
+  .tv-screen {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
 }
 
 .chain-indicator {
-  font-size: 0.55rem;
-  opacity: 0.85;
-  font-weight: 600;
-  position: relative;
-  @include bp.sm { font-size: 0.6rem; }
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+  opacity: 0.9;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-/* -- Chain dots -- */
+/* -- Chain dots (bottom-left, in the actions bar) -- */
 .chain-dots {
   display: flex;
-  justify-content: center;
+  align-items: center;
   flex-wrap: wrap;
   gap: 0.5rem;
-  padding: 0.75rem 1rem 0.5rem;
-  @include bp.sm { gap: 0.6rem; padding: 1rem 1.5rem 0.5rem; }
+  @include bp.sm { gap: 0.6rem; }
+  @include bp.landscape { gap: 0.4rem; }
 }
 
 .dot {
-  width: 12px;
-  height: 12px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--color-border);
+  // Non-selected chains read red; the active ("you are here") chain is green.
+  background: var(--color-primary);
   transition: background 0.35s, transform 0.35s, box-shadow 0.35s;
   // Invisible padding for touch target (total ~24px)
   outline: 6px solid transparent;
@@ -54,27 +63,29 @@
 }
 
 .dot.active {
-  background: var(--color-primary);
+  background: var(--p-green);
   transform: scale(1.45);
-  box-shadow: 0 0 0 3px rgba(153, 0, 48, 0.2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--p-green) 25%, transparent);
   animation: dotBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .dot.done {
-  background: var(--p-green);
-  box-shadow: 0 0 6px rgba(98, 130, 102, 0.4);
+  // Viewed chains stay red but get a soft glow to set them apart from upcoming ones.
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-primary) 40%, transparent);
 }
 
 .dot.clickable {
   cursor: pointer;
 
-  &:hover {
-    transform: scale(1.6);
-    box-shadow: 0 0 0 3px rgba(98, 130, 102, 0.3);
-  }
+  @media (hover: hover) {
+    &:hover {
+      transform: scale(1.6);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 30%, transparent);
+    }
 
-  &.active:hover {
-    box-shadow: 0 0 0 3px rgba(153, 0, 48, 0.3);
+    &.active:hover {
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--p-green) 30%, transparent);
+    }
   }
 }
 
@@ -90,12 +101,16 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  max-width: 680px;
   width: 100%;
-  margin: 0 auto;
   box-sizing: border-box;
+  overflow-y: auto;
   overflow-x: hidden;
   scroll-behavior: smooth;
+
+  // Custom scrollbar
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+
   @include bp.sm { padding: 1.25rem 1rem 1.5rem; gap: 1.25rem; }
 }
 
@@ -135,13 +150,15 @@
   object-fit: cover;
   flex-shrink: 0;
   background: var(--avatar-bg);
-  border: 2px solid var(--color-border);
+  // Neutral base border matches the avatar bg (the crimson/green identity ring
+  // below overrides it for player entries).
+  border: 2px solid var(--avatar-bg);
   @include bp.sm { width: 40px; height: 40px; }
 }
 
 .entry-avatar:not(.entry-avatar--app) {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(153, 0, 48, 0.15);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 15%, transparent);
   animation: avatarSettle 0.4s ease 5s forwards;
 }
 
@@ -158,26 +175,47 @@
 }
 
 .entry-author {
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   font-weight: 700;
   opacity: 0.65;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.15rem;
+  line-height: 1.2;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  @include bp.sm { font-size: 0.7rem; }
+  color: var(--color-primary);
+  @include bp.sm { font-size: 0.85rem; }
 }
 
 .entry-bubble {
+  position: relative;
   background: var(--bs-secondary-bg, var(--color-border));
   border-radius: 0 14px 14px 14px;
-  padding: 0.7rem 0.85rem;
-  font-size: 0.65rem;
-  line-height: 1.8;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.9rem;
+  line-height: 1.3;
   color: var(--color-on-surface);
   word-break: break-word;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   border: 1px solid var(--color-border);
-  @include bp.sm { padding: 0.85rem 1.1rem; }
+  @include bp.sm { padding: 0.4rem 1.1rem; }
+}
+
+.entry-skipped-badge {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.55rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: var(--color-border);
+  border: 1px solid var(--color-on-surface);
+  color: var(--color-on-surface);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .entry-bubble.placeholder-bubble {
@@ -202,15 +240,11 @@
   min-width: 0;
 }
 
-.entry-author--right {
-  text-align: right;
-  color: var(--p-green);
-}
-
 .entry-avatar--app {
+  // Background stays the shared --avatar-bg (inherited); the border matches the
+  // player avatars' settled green identity ring.
   border-color: var(--p-green);
   box-shadow: 0 0 0 2px rgba(98, 130, 102, 0.2);
-  background: var(--color-surface);
   object-fit: contain;
   padding: 3px;
 }
@@ -238,21 +272,151 @@
   @include bp.sm { max-height: 360px; }
 }
 
-/* -- Actions -- */
+/* -- Actions bar on the TV bezel: dots pinned left, buttons centered -- */
 .results-actions {
-  position: sticky;
-  bottom: 0;
-  background: var(--color-surface);
-  border-top: 2px solid var(--color-border);
-  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
-  display: flex;
+  padding: 0.75rem 0.25rem 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
   gap: 0.75rem;
-  justify-content: center;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
-  @include bp.sm { padding: 1rem 1.5rem calc(1rem + env(safe-area-inset-bottom)); }
+  flex-shrink: 0;
+  @include bp.sm { padding: 1rem 0.5rem 0; }
+  @include bp.landscape { padding: 0.5rem 0.25rem 0; }
+
+  .chain-dots { justify-self: start; }
 }
 
-.results-actions .mat-mdc-raised-button {
-  overflow: hidden;
-  position: relative;
+.results-buttons {
+  grid-column: 3;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: flex-end;
+
+  > .btn-secondary { flex-shrink: 0; }
 }
+
+/* -- Subtle separator before the inline GIF action -- */
+.gif-separator {
+  align-self: stretch;
+  height: 1px;
+  // Don't let the scrollable flex feed squeeze this 1px line down to 0.
+  flex-shrink: 0;
+  // Negative margins offset the feed's row gap so the separator sits closer to
+  // the last message box and the GIF button below it.
+  margin: -0.45rem 0 -0.5rem;
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in srgb, var(--color-on-surface) 18%, transparent),
+    transparent
+  );
+}
+
+/* -- Inline "save as GIF" action, framed like the lobby leave/invite buttons
+   so it reads clearly as a button; neutral by default, green on hover -- */
+.gif-inline {
+  align-self: center;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.85rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-on-surface);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+  animation: entryReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.2s ease, color 0.2s ease;
+
+  @media (hover: hover) {
+    &:hover:not([disabled]) {
+      border-color: var(--p-green);
+      color: var(--p-green);
+
+      .gif-inline-icon { transform: scale(1.2); }
+      .gif-icon-default { opacity: 0; }
+      .gif-icon-hover { opacity: 1; }
+      .gif-inline-label { transform: scale(1.1); }
+    }
+  }
+
+  &[disabled] { opacity: 0.5; cursor: default; }
+}
+
+/* Muted export icon by default, swapped for the green variant on hover. */
+.gif-inline-icon {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  @include bp.sm { width: 38px; height: 38px; }
+}
+
+.gif-icon-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: opacity 0.2s ease;
+}
+
+.gif-icon-hover { opacity: 0; }
+
+.gif-inline-label {
+  line-height: 1;
+  transform-origin: left center;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Action buttons — these sit directly on the (always-dark) TV bezel, so they
+   are styled relative to the bezel rather than the page theme. This keeps the
+   dark-on-dark "physical control" look consistent in both light and dark mode
+   (previously light mode rendered bright white buttons floating on the bezel). */
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.75rem 1rem;
+  @include bp.landscape { padding: 0.4rem 0.75rem; }
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #e6e6e6;
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s, background 0.15s;
+
+  @media (hover: hover) {
+    &:hover:not([disabled]) {
+      transform: translate(-1px, -1px);
+      background: rgba(255, 255, 255, 0.12);
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.4);
+      border-color: rgba(255, 255, 255, 0.35);
+    }
+  }
+
+  &:active:not([disabled]) {
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.3);
+  }
+
+  &[disabled] {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+

@@ -91,15 +91,42 @@ class GameServiceTest {
     }
 
     @Test
-    void startGame_ThrowsGameException_WhenFewerThan2Players() {
+    void startGame_ThrowsGameException_WhenZeroPlayers() {
         UUID hostId = UUID.randomUUID();
         Room room = buildRoom("ABCD1234", GamePhase.LOBBY);
         room.setHostId(hostId);
 
         when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
-        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(buildPlayer(hostId, room)));
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of());
 
         assertThrows(GameException.class, () -> gameService.startGame("ABCD1234", hostId));
+    }
+
+    @Test
+    void startGame_SinglePlayer_DoesNotGenerateRoundAssignments() {
+        UUID hostId = UUID.randomUUID();
+        Room room = buildRoom("ABCD1234", GamePhase.LOBBY);
+        room.setHostId(hostId);
+
+        Player solo = buildPlayer(hostId, room);
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(solo));
+        when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(chainRepository.save(any(Chain.class))).thenAnswer(inv -> {
+            Chain c = inv.getArgument(0);
+            c.setId(UUID.randomUUID());
+            return c;
+        });
+
+        gameService.startGame("ABCD1234", hostId);
+
+        // A solo game has a single chain and skips guessing entirely, so the cyclic
+        // Latin-square assignment (which requires N >= 2) must not be invoked.
+        verify(roundAssignmentService, never()).generateAssignments(any(), anyList(), anyList());
+        verify(chainRepository, times(1)).save(any(Chain.class));
+        assertEquals(GamePhase.PROMPTING, room.getPhase());
+        assertEquals(1, room.getTotalRounds());
     }
 
     @Test
