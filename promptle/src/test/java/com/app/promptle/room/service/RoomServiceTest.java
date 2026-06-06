@@ -326,7 +326,7 @@ class RoomServiceTest {
         player.setToken(UUID.randomUUID());
         String token = player.getToken().toString();
         when(playerRepository.findByToken(player.getToken())).thenReturn(Optional.of(player));
-        when(playerRepository.findByRoom(room)).thenReturn(List.of(player));
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(player));
 
         GameStateSnapshot snapshot = roomService.getGameStateSnapshot("ABCD1234", token);
 
@@ -483,7 +483,7 @@ class RoomServiceTest {
         Room room = buildLobbyRoom("ABCD1234");
         Player player = buildPlayer(room);
         when(playerRepository.findByToken(player.getToken())).thenReturn(Optional.of(player));
-        when(playerRepository.findByRoom(room)).thenReturn(List.of(player));
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(player));
 
         GameStateSnapshot snapshot = roomService.getGameStateSnapshot("ABCD1234", player.getToken().toString());
 

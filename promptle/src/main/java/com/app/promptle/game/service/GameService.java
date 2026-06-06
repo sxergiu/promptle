@@ -52,7 +52,7 @@ public class GameService {
     private final long promptingSeconds;
     private final long guessingSeconds;
 
-    // In-memory showcase counters per room (reset on new game not needed for chunk 8)
+    // In-memory showcase counters per room (reset in startGame so repeat games in the same room start clean)
     private final Map<String, Integer> showcaseCounters = new ConcurrentHashMap<>();
 
     public GameService(RoomRepository roomRepository,
@@ -100,7 +100,7 @@ public class GameService {
 
         List<Player> connected = playerRepository.findByRoomAndConnectedTrue(room);
 
-        if (connected.size() < 2 || connected.size() > 8) {
+        if (connected.size() < 1 || connected.size() > 8) {
             throw new GameException("Invalid player count: " + connected.size());
         }
 
@@ -130,7 +130,12 @@ public class GameService {
             savedChains.add(chainRepository.save(chain));
         }
 
-        roundAssignmentService.generateAssignments(room, orderedPlayers, savedChains);
+        // Round assignments use a cyclic Latin square that requires N >= 2 (no player
+        // can guess their own chain). A solo game has a single chain and skips GUESSING,
+        // so assignments are neither possible nor needed.
+        if (orderedPlayers.size() > 1) {
+            roundAssignmentService.generateAssignments(room, orderedPlayers, savedChains);
+        }
         timerService.startRoundTimer(roomCode, 1, promptingSeconds);
 
         List<PlayerDto> playerDtos = connected.stream()
@@ -236,6 +241,16 @@ public class GameService {
             log.warn("[{}] onAllImagesReady: phase is {} — skipping GUESSING transition", roomCode, room.getPhase());
             return;
         }
+
+        // Solo game: a single chain means there is nobody to guess for, so skip the
+        // GUESSING phase entirely and reveal the result immediately.
+        List<Chain> chains = chainRepository.findByRoom(room);
+        if (chains.size() == 1) {
+            log.info("[{}] onAllImagesReady: single-player game — going straight to RESULTS", roomCode);
+            transitionToResults(room);
+            return;
+        }
+
         int oldRound = room.getCurrentRound();
         int newRound = oldRound + 1;
 
@@ -321,31 +336,7 @@ public class GameService {
 
     private void endGuessingRound(Room room) {
         if (room.getCurrentRound() == room.getTotalRounds()) {
-            room.setPhase(GamePhase.RESULTS);
-            roomRepository.save(room);
-
-            eventPublisher.publishEvent(new PhaseChangedApplicationEvent(
-                    room.getRoomCode(), GamePhase.RESULTS, room.getCurrentRound(),
-                    room.getTotalRounds(), 0, Instant.now().toEpochMilli()));
-
-            List<Chain> chains = chainRepository.findByRoom(room);
-            List<ChainDto> chainDtos = chains.stream()
-                    .map(chain -> {
-                        // TODO(chain-style): pass chain.getStyle() into ChainDto constructor once frontend supports it.
-                        List<ChainEntryDto> entryDtos = chainEntryRepository.findByChainOrderByRoundAsc(chain).stream()
-                                .map(e -> new ChainEntryDto(
-                                        e.getAuthor() != null ? e.getAuthor().getId().toString() : null,
-                                        e.getAuthor() != null ? e.getAuthor().getAvatarId() : null,
-                                        e.getText(),
-                                        e.getImageUrl(),
-                                        e.isPlaceholder()
-                                ))
-                                .toList();
-                        return new ChainDto(entryDtos);
-                    })
-                    .toList();
-
-            eventPublisher.publishEvent(new GameResultsApplicationEvent(room.getRoomCode(), new GameResultsEvent(chainDtos)));
+            transitionToResults(room);
         } else {
             room.setPhase(GamePhase.GENERATING);
             roomRepository.save(room);
@@ -357,6 +348,39 @@ public class GameService {
 
             timerService.startGeneratingTimeout(room.getRoomCode(), room.getCurrentRound());
         }
+    }
+
+    /**
+     * Moves the room into RESULTS and publishes the final chain data. Shared by the
+     * normal multi-player path (last guessing round) and the solo path (after the
+     * single image is generated, with no guessing round).
+     */
+    private void transitionToResults(Room room) {
+        room.setPhase(GamePhase.RESULTS);
+        roomRepository.save(room);
+
+        eventPublisher.publishEvent(new PhaseChangedApplicationEvent(
+                room.getRoomCode(), GamePhase.RESULTS, room.getCurrentRound(),
+                room.getTotalRounds(), 0, Instant.now().toEpochMilli()));
+
+        List<Chain> chains = chainRepository.findByRoom(room);
+        List<ChainDto> chainDtos = chains.stream()
+                .map(chain -> {
+                    // TODO(chain-style): pass chain.getStyle() into ChainDto constructor once frontend supports it.
+                    List<ChainEntryDto> entryDtos = chainEntryRepository.findByChainOrderByRoundAsc(chain).stream()
+                            .map(e -> new ChainEntryDto(
+                                    e.getAuthor() != null ? e.getAuthor().getId().toString() : null,
+                                    e.getAuthor() != null ? e.getAuthor().getAvatarId() : null,
+                                    e.getText(),
+                                    e.getImageUrl(),
+                                    e.isPlaceholder()
+                            ))
+                            .toList();
+                    return new ChainDto(entryDtos);
+                })
+                .toList();
+
+        eventPublisher.publishEvent(new GameResultsApplicationEvent(room.getRoomCode(), new GameResultsEvent(chainDtos)));
     }
 
     private void triggerImageGeneration(Room room) {

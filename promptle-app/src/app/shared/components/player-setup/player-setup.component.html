@@ -1,0 +1,60 @@
+<div class="screen-shell">
+  <div class="tv-frame">
+    <div class="tv-screen">
+      <div class="setup">
+        <div class="brand">
+          <h1 class="logo"><span class="letter-green">P</span><span class="letter-red">R</span><span class="letter-green">O</span><span class="letter-red">M</span><span class="letter-green">P</span><span class="letter-red">T</span><span class="letter-green">L</span><span class="letter-red">E</span></h1>
+          <p class="tagline">The Telepromptle</p>
+        </div>
+
+        <div class="identity-row">
+          <div class="avatar-section">
+            <img [src]="selectedIcon.path" [alt]="selectedIcon.id" class="avatar-img" />
+            <button
+              type="button"
+              class="shuffle-badge"
+              (click)="shuffleIcon()"
+              (mouseenter)="diceSpinning = true"
+              (mouseleave)="diceSpinning = false"
+              aria-label="Shuffle avatar"
+            >
+              <img src="app-icons/promptle-shuffle.svg" alt="" class="dice-icon" [class.spinning]="diceSpinning" />
+            </button>
+          </div>
+
+          <div class="identity-fields">
+            <input
+              class="name-input"
+              type="text"
+              [value]="alias()"
+              (input)="onAliasInput($event)"
+              (keydown.enter)="onPlay()"
+              [class.rejected]="aliasRejected()"
+              placeholder="Who are you?"
+              aria-label="Your name"
+              maxlength="13"
+            />
+            <button
+              type="button"
+              class="btn-cta btn-play"
+              [disabled]="!alias().trim() || busy"
+              (click)="onPlay()"
+            >
+              <img src="app-icons/promptle-play.svg" class="btn-icon" alt="" />
+              PLAY
+            </button>
+          </div>
+        </div>
+
+        @if (errorMessage) {
+          <div class="error-message">{{ errorMessage }}</div>
+        }
+      </div>
+    </div>
+    <footer class="setup-footer tv-label-footer">
+      <a href="#" class="footer-link">How to Play</a>
+      <a href="#" class="footer-link">About</a>
+      <a href="#" class="footer-link">Privacy Policy</a>
+    </footer>
+  </div>
+</div>

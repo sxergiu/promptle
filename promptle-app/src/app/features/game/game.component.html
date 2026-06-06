@@ -1,46 +1,59 @@
 
-    <div class="game-shell">
-      @if (phase() !== GamePhase.LOBBY) {
-        <header class="game-header page-header">
-          <div class="header-row">
-            <span class="round-badge">Round {{ currentRound() }} / {{ totalRounds() }}</span>
-            <span class="timer-display" [class.warning]="remainingSeconds() <= 10 && remainingSeconds() > 0">
-              {{ remainingSeconds() }}s
-            </span>
-          </div>
-          <div class="timer-track">
-            <div class="timer-fill"
-                 [class.warning]="remainingSeconds() <= 10 && remainingSeconds() > 0"
-                 [style.width.%]="timerPercent()">
+    <div class="screen-shell">
+      @if (phase() === GamePhase.GENERATING) {
+        <app-generating></app-generating>
+      } @else {
+        <div class="tv-frame">
+          @if (phase() !== GamePhase.LOBBY) {
+            <div class="game-status-bar">
+              <span class="round-badge">Round {{ currentRound() }} / {{ totalRounds() }}</span>
+              <span class="timer-display" [class.warning]="remainingSeconds() <= 10 && remainingSeconds() > 0">
+                <img src="app-icons/promptle-timer.svg" class="btn-icon" alt="" />
+                {{ remainingSeconds() }}s
+              </span>
+            </div>
+          }
+          <div class="tv-screen">
+            @if (phase() !== GamePhase.LOBBY) {
+              <div class="timer-track">
+                <div class="timer-fill"
+                     [class.warning]="remainingSeconds() <= 10 && remainingSeconds() > 0"
+                     [style.width.%]="timerPercent()">
+                </div>
+              </div>
+            }
+            <div class="game-phase" [class.game-phase--flush]="phase() === GamePhase.PROMPTING">
+              @if (phase() === GamePhase.PROMPTING) {
+                <app-prompting
+                  [roomCode]="roomCode"
+                  [submittedCount]="submittedCount()"
+                  [totalCount]="totalPlayerCount()"
+                  [hasSubmitted]="hasSubmitted()"
+                ></app-prompting>
+              }
+              @if (phase() === GamePhase.GUESSING) {
+                @for (r of [currentRound()]; track r) {
+                  <app-guessing
+                    [roomCode]="roomCode"
+                    [imageUrl]="imageUrl() ?? ''"
+                    [submittedCount]="submittedCount()"
+                    [totalCount]="totalPlayerCount()"
+                    [hasSubmitted]="hasSubmitted()"
+                  ></app-guessing>
+                }
+              }
             </div>
           </div>
-        </header>
-      }
-      <div class="game-phase">
-        @if (phase() === GamePhase.PROMPTING) {
-          <app-prompting
-            [roomCode]="roomCode"
-            [submittedCount]="submittedCount()"
-            [totalCount]="totalPlayerCount()"
-            [hasSubmitted]="hasSubmitted()"
-          ></app-prompting>
-        }
-        @if (phase() === GamePhase.GENERATING) {
-          <app-generating></app-generating>
-        }
-        @if (phase() === GamePhase.GUESSING) {
-          @for (r of [currentRound()]; track r) {
-            <app-guessing
-              [roomCode]="roomCode"
-              [imageUrl]="imageUrl() ?? ''"
-              [submittedCount]="submittedCount()"
-              [totalCount]="totalPlayerCount()"
-              [hasSubmitted]="hasSubmitted()"
-            ></app-guessing>
+          @if (phase() === GamePhase.PROMPTING || phase() === GamePhase.GUESSING) {
+            <div class="ready-pips" aria-hidden="true">
+              @for (filled of readyPips(); track $index) {
+                <span class="pip" [class.pip--filled]="filled"></span>
+              }
+            </div>
           }
-        }
-      </div>
+        </div>
+      }
       @if (!wsConnected()) {
-        <div class="reconnecting-overlay">⟳ Reconnecting…</div>
+        <div class="reconnecting-overlay">Reconnecting...</div>
       }
     </div>

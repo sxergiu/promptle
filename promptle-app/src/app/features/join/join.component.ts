@@ -1,79 +1,58 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
+
 import { RoomApiService } from '../../core/services/room-api.service';
 import { PlayerService } from '../../core/services/player.service';
-import { PlayerIcon, PLAYER_ICONS } from '../../core/models/player-icons';
+import { PlayerSetupComponent, PlayerSetupSubmit } from '../../shared/components/player-setup/player-setup.component';
 
 @Component({
   selector: 'app-join',
   standalone: true,
-  imports: [CommonModule, MatButtonModule, MatFormFieldModule, MatInputModule],
+  imports: [PlayerSetupComponent],
   templateUrl: './join.component.html',
   styleUrl: './join.component.scss',
 })
 export class JoinComponent implements OnInit {
-  roomCode: string = '';
-  alias = signal('');
-  errorMessage: string | null = null;
-
-  private _selectedIcon = signal<PlayerIcon>(PLAYER_ICONS[0]);
-
-  get selectedIcon(): PlayerIcon {
-    return this._selectedIcon();
-  }
+  roomCode = '';
+  readonly errorMessage = signal<string | null>(null);
+  readonly busy = signal(false);
 
   constructor(
     private roomApiService: RoomApiService,
     private playerService: PlayerService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
   ) {}
 
   ngOnInit(): void {
-    this._selectedIcon.set(PLAYER_ICONS[Math.floor(Math.random() * PLAYER_ICONS.length)]);
     this.roomCode = this.route.snapshot.paramMap.get('roomCode') ?? '';
     if (this.playerService.loadFromLocalStorage(this.roomCode)) {
       this.router.navigate(['/lobby', this.roomCode]);
-      return;
     }
   }
 
-  shuffleIcon(): void {
-    if (PLAYER_ICONS.length <= 1) return;
-    const current = this._selectedIcon();
-    let next = current;
-    while (next === current) {
-      next = PLAYER_ICONS[Math.floor(Math.random() * PLAYER_ICONS.length)];
-    }
-    this._selectedIcon.set(next);
-  }
-
-  onJoinRoom(): void {
-    if (!this.alias().trim()) return;
-    const icon = this._selectedIcon();
-    this.errorMessage = null;
-    this.roomApiService.joinRoom(this.roomCode, this.alias(), icon.id).subscribe({
+  onJoinRoom({ alias, avatarId }: PlayerSetupSubmit): void {
+    this.errorMessage.set(null);
+    this.busy.set(true);
+    this.roomApiService.joinRoom(this.roomCode, alias, avatarId).subscribe({
       next: (response) => {
         this.playerService.saveToLocalStorage(response.roomCode, {
           playerToken: response.playerToken,
           playerId: response.playerId,
-          alias: this.alias(),
-          avatarId: icon.id,
+          alias,
+          avatarId,
         });
         this.router.navigate(['/lobby', response.roomCode]);
       },
       error: (error) => {
+        this.busy.set(false);
         const message: string = error?.error?.error ?? '';
         if (message.toLowerCase().includes('full')) {
-          this.errorMessage = 'Room is full';
+          this.errorMessage.set('Room is full');
         } else if (message.toLowerCase().includes('in progress')) {
-          this.errorMessage = 'Game already in progress';
+          this.errorMessage.set('Game already in progress');
         } else {
-          this.errorMessage = 'An error occurred. Please try again.';
+          this.errorMessage.set('An error occurred. Please try again.');
         }
       },
     });

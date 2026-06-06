@@ -82,6 +82,9 @@ class ConcurrentSubmissionTest {
     void submitPrompt_Concurrent_TwoPlayers_EndPromptingRoundCalledExactlyOnce() throws Exception {
         Room room = buildRoom("CONCURRENT1", GamePhase.PROMPTING);
         room.setCurrentRound(1);
+        // Round-end threshold is room.getTotalRounds() (= player count fixed at game start);
+        // a 2-player game has totalRounds = 2.
+        room.setTotalRounds(2);
 
         UUID p1Id = UUID.randomUUID();
         UUID p2Id = UUID.randomUUID();

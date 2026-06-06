@@ -1,11 +1,10 @@
 import { Component, Input, OnInit, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { WebSocketService } from '../../../core/services/websocket.service';
 
 @Component({
   selector: 'app-prompting',
   standalone: true,
-  imports: [MatButtonModule],
+  imports: [],
   styleUrl: './prompting.component.scss',
   templateUrl: './prompting.component.html',
 })

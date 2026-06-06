@@ -23,9 +23,16 @@ services:
       # Image generation — reaches native ComfyUI on the host Mac
       IMAGE_GENERATION_PROVIDER: comfyui
       IMAGE_GENERATION_COMFYUI_URL: http://host.docker.internal:8188
-      IMAGE_GENERATION_COMFYUI_WORKFLOW: comfyui-workflow-api.json
+      # text-to-image (round 1)
+      IMAGE_GENERATION_COMFYUI_WORKFLOW: workflows/proto-t2i.json
       IMAGE_GENERATION_COMFYUI_PROMPT_NODE_ID: "6"
       IMAGE_GENERATION_COMFYUI_OUTPUT_NODE_ID: "9"
+      # image-to-image (round 2+)
+      IMAGE_GENERATION_COMFYUI_IMG2IMG_WORKFLOW: workflows/proto-i2i.json
+      IMAGE_GENERATION_COMFYUI_IMG2IMG_PROMPT_NODE_ID: "8"
+      IMAGE_GENERATION_COMFYUI_IMG2IMG_OUTPUT_NODE_ID: "4"
+      IMAGE_GENERATION_COMFYUI_IMG2IMG_LOAD_IMAGE_NODE_ID: "10"
+      IMAGE_GENERATION_COMFYUI_IMG2IMG_DENOISE: "0.55"
 
       # Image storage — ephemeral tmpfs volume mounted below
       IMAGE_STORAGE_PROVIDER: local

@@ -72,4 +72,11 @@ public class RoomController {
         roomService.resetGame(roomCode, token);
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("/{roomCode}/leave-results")
+    public ResponseEntity<Void> leaveResults(@PathVariable String roomCode,
+                                             @RequestParam String token) {
+        roomService.markReturnedToLobby(roomCode, token);
+        return ResponseEntity.ok().build();
+    }
 }

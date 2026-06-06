@@ -155,10 +155,10 @@ describe('LobbyComponent', () => {
 
   // ---- Template ----
 
-  it('renders one PlayerCardComponent per player', () => {
+  it('renders a card for each player plus empty filler slots', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const playerCards = compiled.querySelectorAll('app-player-card');
-    expect(playerCards.length).toBe(component.players().length);
+    expect(playerCards.length).toBe(component.players().length + component.emptySlots().length);
   });
 
   it('Invite Others button visible only to host', () => {
@@ -173,10 +173,8 @@ describe('LobbyComponent', () => {
     }
   });
 
-  it('Start Game button is disabled when fewer than 2 players', () => {
-    component.players.set([
-      { id: PLAYER_ID, alias: 'Alice', avatarId: 'icon-1', connected: true },
-    ]);
+  it('Start Game button is disabled when there are no players', () => {
+    component.players.set([]);
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
@@ -188,8 +186,24 @@ describe('LobbyComponent', () => {
     if (startBtn) {
       expect(startBtn.disabled).toBeTrue();
     } else {
-      expect(component.players().length).toBeLessThan(2);
+      expect(component.players().length).toBeLessThan(1);
     }
+  });
+
+  it('Start Game button is disabled while waiting for players to finish results', () => {
+    component.players.set([
+      { id: PLAYER_ID, alias: 'Alice', avatarId: 'icon-1', connected: true },
+      { id: 'player-2', alias: 'Bob', avatarId: 'icon-2', connected: true },
+    ]);
+    component.waitingForResults.set(true);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const startBtn = Array.from(compiled.querySelectorAll('button')).find(b =>
+      b.textContent?.toLowerCase().includes('start')
+    ) as HTMLButtonElement | undefined;
+
+    expect(startBtn?.disabled).toBeTrue();
   });
 
   it('Start Game button is disabled for non-host', () => {

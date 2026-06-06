@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of } from 'rxjs';
 
 import { ResultsComponent } from './results.component';
@@ -43,9 +45,10 @@ describe('ResultsComponent', () => {
     wsSpy = jasmine.createSpyObj('WebSocketService', ['connect', 'disconnect', 'subscribe', 'send', 'isConnected']);
     wsSpy.isConnected.and.returnValue(false); // tests exercise the connect path
     playerServiceSpy = jasmine.createSpyObj('PlayerService', ['clearLocalStorage', 'loadFromLocalStorage']);
-    roomApiSpy = jasmine.createSpyObj('RoomApiService', ['resetGame']);
+    roomApiSpy = jasmine.createSpyObj('RoomApiService', ['resetGame', 'leaveResults']);
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
     roomApiSpy.resetGame.and.returnValue(of(undefined as void));
+    roomApiSpy.leaveResults.and.returnValue(of(undefined as void));
 
     // Component reads window.history.state instead of getCurrentNavigation()
     history.replaceState({ chains: MOCK_CHAINS, hostId: 'other-player-id' }, '');
@@ -69,6 +72,8 @@ describe('ResultsComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ResultsComponent],
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: WebSocketService, useValue: wsSpy },
         { provide: PlayerService, useValue: playerServiceSpy },
         { provide: RoomApiService, useValue: roomApiSpy },
@@ -207,24 +212,6 @@ describe('ResultsComponent', () => {
 
   // ---- "Next" button ----
 
-  it('Next button is disabled for non-host players', () => {
-    component.isHost.set(false);
-    fixture.detectChanges();
-
-    const compiled = fixture.nativeElement as HTMLElement;
-    const buttons = Array.from(compiled.querySelectorAll('button'));
-    const nextBtn = buttons.find(b =>
-      b.textContent?.toLowerCase().includes('next') ||
-      b.textContent?.toLowerCase().includes('lobby')
-    ) as HTMLButtonElement | undefined;
-
-    if (nextBtn) {
-      expect(nextBtn.disabled).toBeTrue();
-    } else {
-      expect(component.isHost()).toBeFalse();
-    }
-  });
-
   it('Next button is disabled for host when not all entries revealed', () => {
     component.chains.set(MOCK_CHAINS);
     component.isHost.set(true);
@@ -284,8 +271,9 @@ describe('ResultsComponent', () => {
     );
   });
 
-  it('displays "Next" label while there are remaining chains', () => {
+  it('displays "Next" label for the host while there are remaining chains', () => {
     component.chains.set(MOCK_CHAINS);
+    component.isHost.set(true);
     component.currentChainIndex.set(0); // not last chain
     fixture.detectChanges();
 
@@ -295,22 +283,41 @@ describe('ResultsComponent', () => {
     expect(hasNext).toBeTrue();
   });
 
-  it('displays "Back to Lobby" label after all chains showcased', () => {
+  it('hides the "Next" button for non-host players', () => {
     component.chains.set(MOCK_CHAINS);
-    component.currentChainIndex.set(MOCK_CHAINS.length - 1); // last chain
+    component.isHost.set(false);
+    component.currentChainIndex.set(0); // not last chain
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
-    const hasBackToLobby = compiled.textContent?.toLowerCase().includes('lobby');
-    expect(hasBackToLobby).toBeTrue();
+    const buttons = Array.from(compiled.querySelectorAll('button'));
+    const hasNext = buttons.some(b => b.textContent?.toLowerCase().includes('next'));
+    expect(hasNext).toBeFalse();
+  });
+
+  it('displays "Lobby" label after all chains showcased', () => {
+    component.chains.set(MOCK_CHAINS);
+    const lastIndex = MOCK_CHAINS.length - 1;
+    component.currentChainIndex.set(lastIndex);
+    // Fully revealing the last chain flips allChainsCompleted via the reveal effect.
+    component.revealedEntryCount.set(MOCK_CHAINS[lastIndex].entries.length);
+    fixture.detectChanges();
+    fixture.detectChanges(); // let the effect-driven allChainsCompleted propagate
+
+    expect(component.allChainsCompleted()).toBeTrue();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const hasLobby = compiled.textContent?.toLowerCase().includes('lobby');
+    expect(hasLobby).toBeTrue();
   });
 
   // ---- "Back to Lobby" action ----
 
-  it('calls resetGame API when navigating back to lobby', () => {
+  it('signals leave-results and navigates to the lobby individually (no room reset)', () => {
     component.onBackToLobby();
 
-    expect(roomApiSpy.resetGame).toHaveBeenCalledWith(ROOM_CODE, 'tok-results');
+    expect(roomApiSpy.leaveResults).toHaveBeenCalledWith(ROOM_CODE, 'tok-results');
+    expect(roomApiSpy.resetGame).not.toHaveBeenCalled();
+    expect(routerSpy.navigate).toHaveBeenCalledWith(['/lobby', ROOM_CODE]);
   });
 
   it('navigates to /lobby/{roomCode} when GAME_RESET event received', () => {
@@ -322,11 +329,10 @@ describe('ResultsComponent', () => {
 
   // ---- "Export Thread" button ----
 
-  it('Export icon button is present in the UI', () => {
+  it('Export (GIF) button is present in the UI', () => {
     const compiled = fixture.nativeElement as HTMLElement;
-    // Export is now a mat-icon-button; look for aria-label or mat-icon content
-    const exportBtn = compiled.querySelector('[aria-label="Export thread"]')
-      ?? compiled.querySelector('button mat-icon, button .material-icons');
+    const buttons = Array.from(compiled.querySelectorAll('button'));
+    const exportBtn = buttons.find(b => b.textContent?.toLowerCase().includes('gif'));
     expect(exportBtn).toBeTruthy();
   });
 

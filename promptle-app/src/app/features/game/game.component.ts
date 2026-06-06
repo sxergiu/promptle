@@ -52,6 +52,12 @@ export class GameComponent implements OnInit, OnDestroy {
     return (this.remainingSeconds() / total) * 100;
   });
 
+  // One entry per player for the bottom readiness strip — true once that slot
+  // has submitted (green pip), false while we're still waiting (red pip).
+  readonly readyPips = computed(() =>
+    Array.from({ length: this.totalPlayerCount() }, (_, i) => i < this.submittedCount())
+  );
+
   roomCode = '';
   private playerToken = '';
 
