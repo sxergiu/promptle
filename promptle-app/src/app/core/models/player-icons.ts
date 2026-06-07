@@ -16,4 +16,8 @@ export const PLAYER_ICONS: PlayerIcon[] = [
   { id: 'icon-10', path: 'player-icons/wiz-cone.svg' },
   { id: 'icon-11', path: 'player-icons/robocop-saxon.svg' },
   { id: 'icon-12', path: 'player-icons/alien-saxon.svg' },
+  { id: 'icon-13', path: 'player-icons/green-gwiz.svg' },
+  { id: 'icon-14', path: 'player-icons/pink-gwiz.svg' },
+  { id: 'icon-15', path: 'player-icons/red-gwiz.svg' },
+  { id: 'icon-16', path: 'player-icons/angry-gwiz.svg' },
 ];
