@@ -4,7 +4,7 @@
  *
  * Drives a full game through the real UI:
  *   - HOST: created and screenshotted at every screen (home, lobby, prompting,
- *           generating, guessing, results).
+ *           generating, guessing, results), in BOTH light and dark mode.
  *   - GUEST: a bot, driven just enough to satisfy "all players submitted".
  *
  * The script is phase-driven: it reacts to whatever phase the game is in
@@ -56,17 +56,43 @@ const GUESSES = [
   'A glowing city inside a mug',
 ];
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 // ---------------------------------------------------------------------------
-// Screenshot helper
+// Theme helper — ThemeService keys off the `data-theme` / `data-bs-theme`
+// attributes on <html> (see core/services/theme.service.ts). Setting them
+// directly flips the CSS theme without going through the app's signal/toggle,
+// so we can re-screenshot the exact same screen in the other theme.
+// ---------------------------------------------------------------------------
+async function setTheme(page, theme) {
+  await page
+    .evaluate((t) => {
+      document.documentElement.setAttribute('data-theme', t);
+      document.documentElement.setAttribute('data-bs-theme', t);
+      try { localStorage.setItem('theme', t); } catch {}
+    }, theme)
+    .catch(() => {});
+}
+
+// ---------------------------------------------------------------------------
+// Screenshot helper — captures each screen in BOTH light and dark mode.
+//
+// Host doubles every shot: flip to light → snap, flip to dark → snap, restore
+// to light. Doing it on the one page the host already drives gives identical
+// framing in both themes, vs. mirroring screens on the bot guest (which never
+// visits most of them).
 // ---------------------------------------------------------------------------
 let shotIndex = 0;
 async function shot(page, label) {
-  const name = `${String(++shotIndex).padStart(2, '0')}-${label}.png`;
-  await page.screenshot({ path: path.join(OUTDIR, name), fullPage: false });
-  console.log(`  📸 ${name}`);
+  const idx = String(++shotIndex).padStart(2, '0');
+  for (const theme of ['light', 'dark']) {
+    await setTheme(page, theme);
+    await sleep(150); // let theme color transitions settle
+    await page.screenshot({ path: path.join(OUTDIR, `${idx}-${label}-${theme}.png`), fullPage: false });
+  }
+  await setTheme(page, 'light'); // restore so the app keeps running in its default theme
+  console.log(`  📸 ${idx}-${label} (light + dark)`);
 }
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------------------------------------------------------------------------
 // Phase detection — inspect the host DOM to figure out where we are.
@@ -267,6 +293,10 @@ async function main() {
         await sleep(500); // settle fade-in transition
         await shot(host, `round-guessing`);
         const g = GUESSES[guessIdx++ % GUESSES.length];
+        // Capture the in-between state: guess typed, READY enabled, not yet clicked.
+        await host.fill('app-guessing .guess-input', g).catch(() => {});
+        await sleep(200); // let the button enable (disabled until text is non-empty)
+        await shot(host, `round-guessing-filled`);
         await submitGuess(host, g); // host submits first, waits for its submitted state
         await shot(host, `round-guessing-submitted`);
         // Only now does the bot submit — strictly after the submitted screenshot.

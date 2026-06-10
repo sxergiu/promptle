@@ -1,19 +1,22 @@
 # Promptle 2-player simulation
 
 Drives a full 2-player Promptle game through the real UI with Playwright and
-saves a screenshot of every screen the **host** sees. The second player is a bot,
-driven just enough to advance each phase.
+saves a screenshot of every screen the **host** sees, in **both light and dark
+mode**. The second player is a bot, driven just enough to advance each phase.
 
 ## What it captures
 
-`screenshots/` (cleared each run), numbered in order:
+`screenshots/` (cleared each run), numbered in order. Every screen is captured
+twice — `<NN>-<label>-light.png` and `<NN>-<label>-dark.png` (the host flips the
+`data-theme` attribute and re-snaps the same screen):
 
 1. `home` — player setup / create room
 2. `lobby-host-alone` — host in lobby before guest joins
 3. `lobby-two-players` — lobby with both players
 4. `round-prompting` / `round-prompting-submitted`
 5. `generating`
-6. `round-guessing` / `round-guessing-submitted`
+6. `round-guessing` / `round-guessing-filled` (guess typed, READY not yet
+   clicked) / `round-guessing-submitted`
 7. `results-chain-1`, `results-chain-2`, … `results-final`
 
 ## Prerequisites (start these yourself first)
