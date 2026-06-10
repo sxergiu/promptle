@@ -5,4 +5,4 @@
 # 2. ~/ComfyUI/.venv exists
 # 3. comfyui-frontend-package installed.
 # 4. macOS
-~/ComfyUI/.venv/bin/python /Applications/ComfyUI.app/Contents/Resources/ComfyUI/main.py --base-directory ~/ComfyUI --listen 0.0.0.0 --port 8188 --force-fp16
+~/ComfyUI/.venv/bin/python ~/ComfyUI-Installs/ComfyUI/ComfyUI/main.py --base-directory ~/ComfyUI --listen 0.0.0.0 --port 8188 --force-fp16
