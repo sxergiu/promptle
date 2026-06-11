@@ -160,7 +160,8 @@ class FullGameFlowIntegrationTest {
         assertEquals(GamePhase.GUESSING, room.getPhase());
         assertEquals(2, room.getCurrentRound());
 
-        // Step 8-9: Rounds 2-4 guessing
+        // Step 8-9: Rounds 2-4 guessing — every guessing round (including the final one)
+        // is followed by a GENERATING pass so each chain ends on an image.
         for (int round = 2; round <= 4; round++) {
             room = roomRepository.findByRoomCode(roomCode).orElseThrow();
             assertEquals(GamePhase.GUESSING, room.getPhase());
@@ -171,17 +172,23 @@ class FullGameFlowIntegrationTest {
             }
 
             room = roomRepository.findByRoomCode(roomCode).orElseThrow();
-            if (round < 4) {
-                // With chunk 9 automatic image generation, GENERATING may already advance to GUESSING
-                assertTrue(room.getPhase() == GamePhase.GENERATING || room.getPhase() == GamePhase.GUESSING,
-                        "Room must be in GENERATING or GUESSING after guessing round " + round);
-                // Ensure transition to next GUESSING round (idempotent if already done by async pipeline).
-                gameService.onAllImagesReady(roomCode);
-            }
+            GamePhase nextPhase = round < 4 ? GamePhase.GUESSING : GamePhase.RESULTS;
+            // With chunk 9 automatic image generation, GENERATING may already have advanced
+            assertTrue(room.getPhase() == GamePhase.GENERATING || room.getPhase() == nextPhase,
+                    "Room must be in GENERATING or " + nextPhase + " after guessing round " + round);
+            // Ensure the transition completes (idempotent if already done by async pipeline).
+            gameService.onAllImagesReady(roomCode);
         }
 
         room = roomRepository.findByRoomCode(roomCode).orElseThrow();
         assertEquals(GamePhase.RESULTS, room.getPhase());
+
+        // Every chain ends on an image: final-round entries must have a generated image.
+        for (Chain chain : chainRepository.findByRoom(room)) {
+            ChainEntry finalEntry = chainEntryRepository.findByChainAndRound(chain, 4).orElseThrow();
+            assertNotNull(finalEntry.getImageUrl(),
+                    "Final entry of every chain must have an image after the final GENERATING pass");
+        }
     }
 
     // ---- Scenario B — Timer expiry with placeholder insertion ----
@@ -410,6 +417,9 @@ class FullGameFlowIntegrationTest {
         gameService.submitGuess(roomCode, p1.getId(), "guess");
         gameService.submitGuess(roomCode, p2.getId(), "guess");
 
+        // Final GENERATING pass — ensure it completes (idempotent if already done by async pipeline)
+        gameService.onAllImagesReady(roomCode);
+
         room = roomRepository.findByRoomCode(roomCode).orElseThrow();
         assertEquals(GamePhase.RESULTS, room.getPhase());
 
@@ -549,6 +559,9 @@ class FullGameFlowIntegrationTest {
         gameService.submitGuess(roomCode, p1.getId(), "forest guess");
         gameService.submitGuess(roomCode, p2.getId(), "storm guess");
 
+        // Final GENERATING pass — ensure it completes (idempotent if already done by async pipeline)
+        gameService.onAllImagesReady(roomCode);
+
         room = roomRepository.findByRoomCode(roomCode).orElseThrow();
         assertEquals(GamePhase.RESULTS, room.getPhase(), "Room must be in RESULTS phase");
 
@@ -578,6 +591,157 @@ class FullGameFlowIntegrationTest {
         var snapshot = roomService.getGameStateSnapshot(roomCode, p1Token);
         assertEquals(GamePhase.RESULTS, snapshot.phase(),
                 "Snapshot for a reconnecting player in RESULTS must reflect the RESULTS phase");
+    }
+
+    // ---- Scenario K — Generating timeout on the final round still reaches RESULTS ----
+
+    @Test
+    void scenarioK_GeneratingTimeoutOnFinalRound_StillReachesResults() throws Exception {
+        // Round 1 images complete instantly; the final pass hangs (never-completing futures),
+        // simulating a stuck generator that the generating timeout must recover from.
+        when(imageGenerationService.generateImage(anyString()))
+                .thenReturn(CompletableFuture.completedFuture("http://test-image/img.png"))
+                .thenReturn(CompletableFuture.completedFuture("http://test-image/img.png"))
+                .thenReturn(new CompletableFuture<>());
+
+        String roomCode = createRoomAndGetCode("P1", "icon-1");
+        Room room = roomRepository.findByRoomCode(roomCode).orElseThrow();
+        Player host = playerRepository.findById(room.getHostId()).orElseThrow();
+        String p1Token = host.getToken().toString();
+        String p2Token = joinPlayer(roomCode, "P2", "icon-2");
+
+        connectPlayers(roomCode, p1Token, p2Token);
+        startGame(roomCode, p1Token);
+
+        Player p1 = playerRepository.findByToken(UUID.fromString(p1Token)).orElseThrow();
+        Player p2 = playerRepository.findByToken(UUID.fromString(p2Token)).orElseThrow();
+
+        gameService.submitPrompt(roomCode, p1.getId(), "a prompt");
+        gameService.submitPrompt(roomCode, p2.getId(), "another prompt");
+        gameService.onAllImagesReady(roomCode);
+
+        gameService.submitGuess(roomCode, p1.getId(), "guess one");
+        gameService.submitGuess(roomCode, p2.getId(), "guess two");
+
+        // The hung final pass leaves the room stuck in GENERATING…
+        room = roomRepository.findByRoomCode(roomCode).orElseThrow();
+        assertEquals(GamePhase.GENERATING, room.getPhase(),
+                "Room must remain in GENERATING while final images never complete");
+
+        // …until the generating timeout fires (it calls onAllImagesReady).
+        gameService.onAllImagesReady(roomCode);
+
+        room = roomRepository.findByRoomCode(roomCode).orElseThrow();
+        assertEquals(GamePhase.RESULTS, room.getPhase(),
+                "Generating timeout on the final round must still reach RESULTS");
+
+        // Chains are intact; the final entries simply have no image.
+        List<Chain> chains = chainRepository.findByRoom(room);
+        assertEquals(2, chains.size());
+        for (Chain chain : chains) {
+            ChainEntry finalEntry = chainEntryRepository.findByChainAndRound(chain, 2).orElseThrow();
+            assertNull(finalEntry.getImageUrl(),
+                    "Final entry image stays null when the final generation never completed");
+        }
+    }
+
+    // ---- Scenario L — Host returns first: snapshot shows full roster with returned status ----
+
+    @Test
+    void scenarioL_HostReturnsFirst_SnapshotShowsFullRosterWithReturnedStatus() throws Exception {
+        when(imageGenerationService.generateImage(anyString()))
+                .thenReturn(CompletableFuture.completedFuture("http://test-image/img.png"));
+
+        String roomCode = createRoomAndGetCode("P1", "icon-1");
+        Room room = roomRepository.findByRoomCode(roomCode).orElseThrow();
+        Player host = playerRepository.findById(room.getHostId()).orElseThrow();
+        String p1Token = host.getToken().toString();
+        connectPlayer(roomCode, p1Token);
+        // joinAndConnect: a joined-but-never-connected player is deleted as a lobby
+        // ghost by the next join, which would silently shrink the roster.
+        String p2Token = joinAndConnect(roomCode, "P2", "icon-2");
+        String p3Token = joinAndConnect(roomCode, "P3", "icon-3");
+
+        startGame(roomCode, p1Token);
+
+        Player p1 = playerRepository.findByToken(UUID.fromString(p1Token)).orElseThrow();
+        Player p2 = playerRepository.findByToken(UUID.fromString(p2Token)).orElseThrow();
+        Player p3 = playerRepository.findByToken(UUID.fromString(p3Token)).orElseThrow();
+
+        gameService.submitPrompt(roomCode, p1.getId(), "prompt 1");
+        gameService.submitPrompt(roomCode, p2.getId(), "prompt 2");
+        gameService.submitPrompt(roomCode, p3.getId(), "prompt 3");
+        gameService.onAllImagesReady(roomCode);
+
+        for (int round = 2; round <= 3; round++) {
+            gameService.submitGuess(roomCode, p1.getId(), "guess r" + round);
+            gameService.submitGuess(roomCode, p2.getId(), "guess r" + round);
+            gameService.submitGuess(roomCode, p3.getId(), "guess r" + round);
+            gameService.onAllImagesReady(roomCode);
+        }
+
+        room = roomRepository.findByRoomCode(roomCode).orElseThrow();
+        assertEquals(GamePhase.RESULTS, room.getPhase());
+
+        // The host leaves the showcase first…
+        ResponseEntity<Void> leaveResponse = restTemplate.postForEntity(
+                url("/api/rooms/" + roomCode + "/leave-results?token=" + p1Token),
+                null,
+                Void.class
+        );
+        assertEquals(HttpStatus.OK, leaveResponse.getStatusCode());
+
+        // …and the lobby snapshot still shows everyone, with correct return status.
+        var snapshot = roomService.getGameStateSnapshot(roomCode, p1Token);
+        assertEquals(GamePhase.RESULTS, snapshot.phase());
+        assertEquals(3, snapshot.players().size(),
+                "RESULTS snapshot must contain the full game roster for the first returner");
+        assertTrue(snapshot.players().stream()
+                        .filter(dto -> dto.id().equals(p1.getId().toString()))
+                        .allMatch(dto -> dto.returnedToLobby()),
+                "The returning host must be flagged returnedToLobby");
+        assertTrue(snapshot.players().stream()
+                        .filter(dto -> !dto.id().equals(p1.getId().toString()))
+                        .noneMatch(dto -> dto.returnedToLobby()),
+                "Players still viewing results must not be flagged returned");
+    }
+
+    // ---- Scenario M — Reconnect during the final generating pass ----
+
+    @Test
+    void scenarioM_ReconnectDuringFinalGeneratingPass_SnapshotShowsGeneratingAtRoundN() throws Exception {
+        when(imageGenerationService.generateImage(anyString()))
+                .thenReturn(CompletableFuture.completedFuture("http://test-image/img.png"))
+                .thenReturn(CompletableFuture.completedFuture("http://test-image/img.png"))
+                .thenReturn(new CompletableFuture<>());
+
+        String roomCode = createRoomAndGetCode("P1", "icon-1");
+        Room room = roomRepository.findByRoomCode(roomCode).orElseThrow();
+        Player host = playerRepository.findById(room.getHostId()).orElseThrow();
+        String p1Token = host.getToken().toString();
+        String p2Token = joinPlayer(roomCode, "P2", "icon-2");
+
+        connectPlayers(roomCode, p1Token, p2Token);
+        startGame(roomCode, p1Token);
+
+        Player p1 = playerRepository.findByToken(UUID.fromString(p1Token)).orElseThrow();
+        Player p2 = playerRepository.findByToken(UUID.fromString(p2Token)).orElseThrow();
+
+        gameService.submitPrompt(roomCode, p1.getId(), "a prompt");
+        gameService.submitPrompt(roomCode, p2.getId(), "another prompt");
+        gameService.onAllImagesReady(roomCode);
+
+        gameService.submitGuess(roomCode, p1.getId(), "guess one");
+        gameService.submitGuess(roomCode, p2.getId(), "guess two");
+
+        // A player reconnecting mid final pass restores its state from the snapshot alone.
+        var snapshot = roomService.getGameStateSnapshot(roomCode, p1Token);
+        assertEquals(GamePhase.GENERATING, snapshot.phase());
+        assertEquals(2, snapshot.currentRound());
+        assertEquals(2, snapshot.totalRounds());
+        assertEquals(0L, snapshot.timerSeconds());
+        assertEquals(0L, snapshot.serverTimestamp());
+        assertNull(snapshot.imageUrl());
     }
 
     // ---- Helpers ----

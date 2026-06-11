@@ -11,6 +11,7 @@ import { GamePhase } from '../../core/models/game-phase.enum';
 import { PromptingPhaseComponent } from './prompting/prompting.component';
 import { GeneratingComponent } from './generating/generating.component';
 import { GuessingPhaseComponent } from './guessing/guessing.component';
+import { SoundService } from '../../core/services/sound.service';
 
 describe('GameComponent', () => {
   let component: GameComponent;
@@ -19,6 +20,7 @@ describe('GameComponent', () => {
   let wsSpy: jasmine.SpyObj<WebSocketService>;
   let playerServiceSpy: jasmine.SpyObj<PlayerService>;
   let routerSpy: jasmine.SpyObj<Router>;
+  let soundSpy: jasmine.SpyObj<SoundService>;
 
   const ROOM_CODE = 'GAME1234';
   const PLAYER_TOKEN = 'game-player-tok';
@@ -54,6 +56,9 @@ describe('GameComponent', () => {
     wsSpy = jasmine.createSpyObj('WebSocketService', ['connect', 'disconnect', 'subscribe', 'send']);
     playerServiceSpy = jasmine.createSpyObj('PlayerService', ['loadFromLocalStorage']);
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    soundSpy = jasmine.createSpyObj('SoundService', [
+      'roundStart', 'phaseGenerating', 'resultsReveal', 'imageReady', 'timerWarning', 'timerFinal',
+    ]);
 
     playerServiceSpy.loadFromLocalStorage.and.returnValue({
       playerToken: PLAYER_TOKEN,
@@ -80,6 +85,7 @@ describe('GameComponent', () => {
         { provide: WebSocketService, useValue: wsSpy },
         { provide: PlayerService, useValue: playerServiceSpy },
         { provide: Router, useValue: routerSpy },
+        { provide: SoundService, useValue: soundSpy },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -196,8 +202,12 @@ describe('GameComponent', () => {
     expect(component.serverTimestamp()).toBe(1700000001000);
   });
 
-  it('buffers GUESSING phase until imageUrl arrives, then flushes', () => {
-    // Phase event arrives first — must NOT flip to GUESSING yet
+  it('applies GUESSING phase immediately and resolves imageUrl from the HTTP snapshot', () => {
+    // The GUESSING image is fetched from the snapshot rather than buffered behind the user queue.
+    roomApiSpy.getGameStateSnapshot.and.returnValue(
+      of({ ...mockSnapshot, phase: GamePhase.GUESSING, imageUrl: '/api/images/game/img1' })
+    );
+
     wsCallbacks[`/topic/game/${ROOM_CODE}`]({
       phase: GamePhase.GUESSING,
       round: 2,
@@ -206,17 +216,21 @@ describe('GameComponent', () => {
       serverTimestamp: 1700000001000,
     });
     fixture.detectChanges();
-    expect(component.phase()).not.toBe(GamePhase.GUESSING); // still buffered
 
-    // imageUrl payload arrives — should flush the buffered transition
-    wsCallbacks['/user/queue/game']({ round: 2, imageUrl: '/api/images/game/img1' });
-    fixture.detectChanges();
-
+    // Phase is applied right away — no longer buffered waiting for the image payload.
     expect(component.phase()).toBe(GamePhase.GUESSING);
     expect(component.currentRound()).toBe(2);
     expect(component.timerSeconds()).toBe(45);
     expect(component.serverTimestamp()).toBe(1700000001000);
     expect(component.imageUrl()).toBe('/api/images/game/img1');
+  });
+
+  it('updates imageUrl when a RoundReadyPayload arrives on the user queue', () => {
+    // The user-queue payload still updates imageUrl if it arrives (faster than HTTP).
+    wsCallbacks['/user/queue/game']({ round: 2, imageUrl: '/api/images/game/img2' });
+    fixture.detectChanges();
+
+    expect(component.imageUrl()).toBe('/api/images/game/img2');
   });
 
   // ---- SubmissionUpdateEvent ----
@@ -241,6 +255,91 @@ describe('GameComponent', () => {
     fixture.detectChanges();
 
     expect(component.imageUrl()).toBe('/api/images/game/img1');
+  });
+
+  // ---- Reconnect idempotency ----
+
+  it('re-delivered phase event for the same phase/round does not reset submission state', () => {
+    // The init snapshot seeded PROMPTING#1; simulate this player having submitted.
+    component.hasSubmitted.set(true);
+    component.submittedCount.set(2);
+
+    wsCallbacks[`/topic/game/${ROOM_CODE}`]({
+      phase: GamePhase.PROMPTING,
+      round: 1,
+      totalRounds: 4,
+      timerSeconds: 42,
+      serverTimestamp: 1700000005000,
+    });
+    fixture.detectChanges();
+
+    expect(component.hasSubmitted()).toBeTrue();
+    expect(component.submittedCount()).toBe(2);
+    // The timer base is still refreshed by the re-delivery.
+    expect(component.timerSeconds()).toBe(42);
+    expect(component.serverTimestamp()).toBe(1700000005000);
+  });
+
+  it('phase event for a new phase/round resets submission state', () => {
+    component.hasSubmitted.set(true);
+    component.submittedCount.set(2);
+
+    wsCallbacks[`/topic/game/${ROOM_CODE}`]({
+      phase: GamePhase.GENERATING,
+      round: 1,
+      totalRounds: 4,
+      timerSeconds: 0,
+      serverTimestamp: 1700000006000,
+    });
+    fixture.detectChanges();
+
+    expect(component.phase()).toBe(GamePhase.GENERATING);
+    expect(component.hasSubmitted()).toBeFalse();
+    expect(component.submittedCount()).toBe(0);
+  });
+
+  it('snapshot restores hasSubmitted for the current round even after a WS phase event', () => {
+    // WS wins the race: a live phase event arrives before the snapshot response.
+    wsCallbacks[`/topic/game/${ROOM_CODE}`]({
+      phase: GamePhase.GENERATING,
+      round: 1,
+      totalRounds: 4,
+      timerSeconds: 0,
+      serverTimestamp: 1700000006000,
+    });
+    expect(component.hasSubmitted()).toBeFalse();
+
+    roomApiSpy.getGameStateSnapshot.and.returnValue(of({
+      ...mockSnapshot,
+      phase: GamePhase.GENERATING,
+      currentRound: 1,
+      hasSubmitted: true,
+    }));
+    (component as any)._fetchSnapshot();
+
+    expect(component.hasSubmitted()).toBeTrue();
+  });
+
+  it('snapshot for a different round does not override live WS submission state', () => {
+    wsCallbacks[`/topic/game/${ROOM_CODE}`]({
+      phase: GamePhase.GENERATING,
+      round: 2,
+      totalRounds: 4,
+      timerSeconds: 0,
+      serverTimestamp: 1700000006000,
+    });
+    expect(component.hasSubmitted()).toBeFalse();
+
+    // Stale snapshot from the previous round must not unlock/relock the UI.
+    roomApiSpy.getGameStateSnapshot.and.returnValue(of({
+      ...mockSnapshot,
+      phase: GamePhase.GENERATING,
+      currentRound: 1,
+      hasSubmitted: true,
+    }));
+    (component as any)._fetchSnapshot();
+
+    expect(component.hasSubmitted()).toBeFalse();
   });
 
   // ---- remainingSeconds computed signal ----
@@ -349,5 +448,52 @@ describe('GameComponent', () => {
   it('disconnects WebSocket on destroy', () => {
     component.ngOnDestroy();
     expect(wsSpy.disconnect).toHaveBeenCalled();
+  });
+
+  // ---- Sound cues ----
+
+  describe('sound cues', () => {
+    const phaseEvent = (phase: GamePhase, round: number) => {
+      wsCallbacks[`/topic/game/${ROOM_CODE}`]({
+        phase, round, totalRounds: 4, timerSeconds: 60, serverTimestamp: 1700000002000,
+      });
+      fixture.detectChanges();
+    };
+
+    it('does NOT fire any phase cue on snapshot hydration (only live WS events)', () => {
+      // The component already hydrated PROMPTING from the mock snapshot in beforeEach.
+      expect(soundSpy.roundStart).not.toHaveBeenCalled();
+      expect(soundSpy.phaseGenerating).not.toHaveBeenCalled();
+    });
+
+    it('does NOT re-fire roundStart when the already-hydrated phase/round is re-delivered', () => {
+      // Snapshot hydrated PROMPTING#1; a duplicate broadcast / reconnect of the same
+      // phase+round must not replay the cue (it only refreshes the timer base).
+      phaseEvent(GamePhase.PROMPTING, 1);
+      expect(soundSpy.roundStart).not.toHaveBeenCalled();
+    });
+
+    it('plays roundStart on a live GUESSING phase event', () => {
+      roomApiSpy.getGameStateSnapshot.and.returnValue(of({ ...mockSnapshot, phase: GamePhase.GUESSING }));
+      phaseEvent(GamePhase.GUESSING, 2);
+      expect(soundSpy.roundStart).toHaveBeenCalledTimes(1);
+    });
+
+    it('plays phaseGenerating on a live GENERATING phase event', () => {
+      phaseEvent(GamePhase.GENERATING, 1);
+      expect(soundSpy.phaseGenerating).toHaveBeenCalledTimes(1);
+    });
+
+    it('plays imageReady when a RoundReadyPayload arrives', () => {
+      wsCallbacks['/user/queue/game']({ round: 2, imageUrl: '/api/images/game/img1' });
+      expect(soundSpy.imageReady).toHaveBeenCalledTimes(1);
+    });
+
+    it('plays resultsReveal once even if both RESULTS events arrive', () => {
+      wsCallbacks[`/topic/game/${ROOM_CODE}`]({ chains: MOCK_CHAINS });
+      wsCallbacks['/user/queue/game']({ chains: MOCK_CHAINS });
+      fixture.detectChanges();
+      expect(soundSpy.resultsReveal).toHaveBeenCalledTimes(1);
+    });
   });
 });

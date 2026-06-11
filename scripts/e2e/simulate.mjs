@@ -4,7 +4,8 @@
  *
  * Drives a full game through the real UI:
  *   - HOST: created and screenshotted at every screen (home, lobby, prompting,
- *           generating, guessing, results), in BOTH light and dark mode.
+ *           generating, guessing, results), at THREE viewports (desktop, mobile
+ *           portrait, mobile landscape), each in BOTH light and dark mode.
  *   - GUEST: a bot, driven just enough to satisfy "all players submitted".
  *
  * The script is phase-driven: it reacts to whatever phase the game is in
@@ -45,6 +46,16 @@ const OUTDIR = process.env.OUTDIR ?? path.join(__dirname, 'screenshots');
 const HOST_NAME = 'Hostie';
 const GUEST_NAME = 'Botley';
 
+// Viewports each screen is captured at. Every screen is shot in each of these,
+// in both light and dark mode → 3 viewports × 2 themes = 6 images per screen.
+// `desktop` is also the viewport the host is driven at (restored after each shot).
+const DESKTOP_VIEWPORT = { width: 1280, height: 900 };
+const VIEWPORTS = [
+  { name: 'desktop', viewport: DESKTOP_VIEWPORT },
+  { name: 'mobile-portrait', viewport: { width: 390, height: 844 } },   // iPhone-ish portrait
+  { name: 'mobile-landscape', viewport: { width: 844, height: 390 } },  // iPhone-ish landscape
+];
+
 const PROMPTS = [
   'A cat astronaut planting a flag on the moon, vaporwave',
   'A medieval knight fighting a giant rubber duck',
@@ -75,23 +86,35 @@ async function setTheme(page, theme) {
 }
 
 // ---------------------------------------------------------------------------
-// Screenshot helper — captures each screen in BOTH light and dark mode.
+// Screenshot helper — captures each screen across every VIEWPORT (desktop,
+// mobile portrait, mobile landscape) in BOTH light and dark mode.
 //
-// Host doubles every shot: flip to light → snap, flip to dark → snap, restore
-// to light. Doing it on the one page the host already drives gives identical
-// framing in both themes, vs. mirroring screens on the bot guest (which never
-// visits most of them).
+// Host multiplies every shot: for each viewport, flip to light → snap, flip to
+// dark → snap. The viewport + theme are restored to desktop/light afterwards so
+// the app keeps being driven in its default layout. Doing it on the one page the
+// host already drives gives identical framing in every variant, vs. mirroring
+// screens on the bot guest (which never visits most of them).
 // ---------------------------------------------------------------------------
 let shotIndex = 0;
 async function shot(page, label) {
   const idx = String(++shotIndex).padStart(2, '0');
-  for (const theme of ['light', 'dark']) {
-    await setTheme(page, theme);
-    await sleep(150); // let theme color transitions settle
-    await page.screenshot({ path: path.join(OUTDIR, `${idx}-${label}-${theme}.png`), fullPage: false });
+  for (const { name, viewport } of VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    await sleep(250); // let the responsive layout reflow before theming/snapping
+    for (const theme of ['light', 'dark']) {
+      await setTheme(page, theme);
+      await sleep(150); // let theme color transitions settle
+      // One folder per flow (viewport + theme), e.g. mobile-landscape-light/,
+      // with the ordered screen name inside.
+      const dir = path.join(OUTDIR, `${name}-${theme}`);
+      await page.screenshot({ path: path.join(dir, `${idx}-${label}.png`), fullPage: false });
+    }
   }
-  await setTheme(page, 'light'); // restore so the app keeps running in its default theme
-  console.log(`  📸 ${idx}-${label} (light + dark)`);
+  // Restore so the app keeps running in its default viewport + theme.
+  await page.setViewportSize(DESKTOP_VIEWPORT);
+  await setTheme(page, 'light');
+  await sleep(150); // let the reflow back to desktop settle before driving resumes
+  console.log(`  📸 ${idx}-${label} (desktop + mobile portrait/landscape × light + dark)`);
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +232,12 @@ async function submitGuess(page, text) {
 // ---------------------------------------------------------------------------
 async function main() {
   await rm(OUTDIR, { recursive: true, force: true });
-  await mkdir(OUTDIR, { recursive: true });
+  // One folder per flow: <viewport>-<theme> (e.g. mobile-landscape-light).
+  for (const { name } of VIEWPORTS) {
+    for (const theme of ['light', 'dark']) {
+      await mkdir(path.join(OUTDIR, `${name}-${theme}`), { recursive: true });
+    }
+  }
   console.log(`\nPromptle 2-player simulation`);
   console.log(`  base url : ${BASE_URL}`);
   console.log(`  output   : ${OUTDIR}`);
@@ -218,8 +246,8 @@ async function main() {
   const browser = await chromium.launch({ headless: HEADLESS, slowMo: SLOWMO });
 
   // Two isolated contexts = two independent players (separate localStorage).
-  const hostCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-  const guestCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const hostCtx = await browser.newContext({ viewport: DESKTOP_VIEWPORT });
+  const guestCtx = await browser.newContext({ viewport: DESKTOP_VIEWPORT });
   const host = await hostCtx.newPage();
   const guest = await guestCtx.newPage();
 

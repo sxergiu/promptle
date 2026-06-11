@@ -1,12 +1,32 @@
-<img
-  [src]="theme.theme() === 'dark' ? 'app-icons/promptle-sun.svg' : 'app-icons/promptle-moon.svg'"
-  class="theme-toggle"
-  (click)="theme.toggle()"
-  [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
-  role="button"
-  tabindex="0"
-  (keydown.enter)="theme.toggle()"
-  (keydown.space)="theme.toggle()"
-/>
+<div class="corner-toggles">
+  <span
+    class="sound-label"
+    [class.sound-label--show]="soundLabelVisible()"
+    [class.sound-label--on]="!sound.muted()"
+    aria-live="polite"
+  >{{ sound.muted() ? 'Sound OFF' : 'Sound ON' }}</span>
+  <img
+    [src]="sound.muted()
+      ? (theme.theme() === 'dark' ? 'app-icons/promptle-sound-off-dark.svg' : 'app-icons/promptle-sound-off.svg')
+      : 'app-icons/promptle-sound-on.svg'"
+    class="corner-toggle sound-toggle"
+    (click)="onSoundToggle()"
+    [attr.aria-label]="sound.muted() ? 'Unmute sounds' : 'Mute sounds'"
+    role="button"
+    tabindex="0"
+    (keydown.enter)="onSoundToggle()"
+    (keydown.space)="onSoundToggle()"
+  />
+  <img
+    [src]="theme.theme() === 'dark' ? 'app-icons/promptle-sun.svg' : 'app-icons/promptle-moon.svg'"
+    class="corner-toggle theme-toggle"
+    (click)="theme.toggle()"
+    [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+    role="button"
+    tabindex="0"
+    (keydown.enter)="theme.toggle()"
+    (keydown.space)="theme.toggle()"
+  />
+</div>
 
 <router-outlet />

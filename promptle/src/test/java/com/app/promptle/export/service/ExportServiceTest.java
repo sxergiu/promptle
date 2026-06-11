@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,7 +35,9 @@ class ExportServiceTest {
 
     @BeforeEach
     void setUp() {
-        exportService = new ExportService(gifEncoder, testDir.toString(), 540, 675, 4, 3, 3, 3);
+        // (gifEncoder, storagePath, width, height, outputWidth, fps, transition, text, image, title, outro)
+        exportService = new ExportService(gifEncoder, testDir.toString(),
+                540, 675, 540, 15, 0.4, 2, 2, 2, 2);
     }
 
     // ---- helpers ----
@@ -51,9 +53,9 @@ class ExportServiceTest {
                 new ChainEntryDto("p3", "icon-3", "Golden waves at dusk", null, false)
         );
         List<PlayerDto> players = List.of(
-                new PlayerDto("p1", "Alice", "icon-1", true),
-                new PlayerDto("p2", "Bob", "icon-2", true),
-                new PlayerDto("p3", "Carol", "icon-3", true)
+                new PlayerDto("p1", "Alice", "icon-1", true, false),
+                new PlayerDto("p2", "Bob", "icon-2", true, false),
+                new PlayerDto("p3", "Carol", "icon-3", true, false)
         );
         return createChainRequest(entries, players);
     }
@@ -63,18 +65,18 @@ class ExportServiceTest {
     @Test
     void exportChain_ValidChain_CallsGifEncoder() throws Exception {
         ExportRequest request = createThreeEntryChain();
-        when(gifEncoder.encode(any(Path.class))).thenReturn(new byte[]{1, 2, 3});
+        when(gifEncoder.encode(any(), anyList(), anyDouble(), anyInt(), anyInt())).thenReturn(new byte[]{1, 2, 3});
 
         exportService.exportChain(request, "ABCD1234");
 
-        verify(gifEncoder).encode(any(Path.class));
+        verify(gifEncoder).encode(any(), anyList(), anyDouble(), anyInt(), anyInt());
     }
 
     @Test
     void exportChain_ValidChain_ReturnsBytesFromGifEncoder() throws Exception {
         byte[] expected = {0x47, 0x49, 0x46, 0x38, 0x39, 0x61};
         ExportRequest request = createThreeEntryChain();
-        when(gifEncoder.encode(any(Path.class))).thenReturn(expected);
+        when(gifEncoder.encode(any(), anyList(), anyDouble(), anyInt(), anyInt())).thenReturn(expected);
 
         byte[] result = exportService.exportChain(request, "ABCD1234");
 
@@ -86,7 +88,7 @@ class ExportServiceTest {
         ExportRequest request = createThreeEntryChain();
 
         ArgumentCaptor<Path> pathCaptor = ArgumentCaptor.forClass(Path.class);
-        when(gifEncoder.encode(pathCaptor.capture())).thenAnswer(invocation -> {
+        when(gifEncoder.encode(pathCaptor.capture(), anyList(), anyDouble(), anyInt(), anyInt())).thenAnswer(invocation -> {
             Path tempDir = pathCaptor.getValue();
             try (Stream<Path> pngs = Files.list(tempDir).filter(p -> p.toString().endsWith(".png"))) {
                 // title + 3 text entries + 1 image entry + outro = 6 frames
@@ -102,7 +104,7 @@ class ExportServiceTest {
 
         exportService.exportChain(request, "ABCD1234");
 
-        verify(gifEncoder).encode(any(Path.class));
+        verify(gifEncoder).encode(any(), anyList(), anyDouble(), anyInt(), anyInt());
     }
 
     @Test
@@ -111,12 +113,12 @@ class ExportServiceTest {
                 new ChainEntryDto("p1", "icon-1", "A prompt text", null, false)
         );
         List<PlayerDto> players = List.of(
-                new PlayerDto("p1", "Alice", "icon-1", true)
+                new PlayerDto("p1", "Alice", "icon-1", true, false)
         );
         ExportRequest request = createChainRequest(entries, players);
 
         ArgumentCaptor<Path> pathCaptor = ArgumentCaptor.forClass(Path.class);
-        when(gifEncoder.encode(pathCaptor.capture())).thenAnswer(invocation -> {
+        when(gifEncoder.encode(pathCaptor.capture(), anyList(), anyDouble(), anyInt(), anyInt())).thenAnswer(invocation -> {
             Path tempDir = pathCaptor.getValue();
             try (Stream<Path> pngs = Files.list(tempDir).filter(p -> p.toString().endsWith(".png"))) {
                 // title + 1 text + outro = 3 frames (no image frame since imageUrl is null)
@@ -135,12 +137,12 @@ class ExportServiceTest {
                 new ChainEntryDto("p1", "icon-1", "Timed out", null, true)
         );
         List<PlayerDto> players = List.of(
-                new PlayerDto("p1", "Alice", "icon-1", true)
+                new PlayerDto("p1", "Alice", "icon-1", true, false)
         );
         ExportRequest request = createChainRequest(entries, players);
 
         ArgumentCaptor<Path> pathCaptor = ArgumentCaptor.forClass(Path.class);
-        when(gifEncoder.encode(pathCaptor.capture())).thenAnswer(invocation -> {
+        when(gifEncoder.encode(pathCaptor.capture(), anyList(), anyDouble(), anyInt(), anyInt())).thenAnswer(invocation -> {
             Path tempDir = pathCaptor.getValue();
             try (Stream<Path> pngs = Files.list(tempDir).filter(p -> p.toString().endsWith(".png"))) {
                 long frameCount = pngs.count();
@@ -151,7 +153,7 @@ class ExportServiceTest {
 
         exportService.exportChain(request, "ABCD1234");
 
-        verify(gifEncoder).encode(any(Path.class));
+        verify(gifEncoder).encode(any(), anyList(), anyDouble(), anyInt(), anyInt());
     }
 
     @Test
@@ -160,12 +162,12 @@ class ExportServiceTest {
                 new ChainEntryDto("p1", "icon-1", "Only text here", null, false)
         );
         List<PlayerDto> players = List.of(
-                new PlayerDto("p1", "Alice", "icon-1", true)
+                new PlayerDto("p1", "Alice", "icon-1", true, false)
         );
         ExportRequest request = createChainRequest(entries, players);
 
         ArgumentCaptor<Path> pathCaptor = ArgumentCaptor.forClass(Path.class);
-        when(gifEncoder.encode(pathCaptor.capture())).thenAnswer(invocation -> {
+        when(gifEncoder.encode(pathCaptor.capture(), anyList(), anyDouble(), anyInt(), anyInt())).thenAnswer(invocation -> {
             Path tempDir = pathCaptor.getValue();
             try (Stream<Path> pngs = Files.list(tempDir).filter(p -> p.toString().endsWith(".png"))) {
                 long frameCount = pngs.count();
@@ -183,10 +185,10 @@ class ExportServiceTest {
                 new ChainEntryDto("p1", "icon-1", "Hello world", null, false)
         );
         List<PlayerDto> players = List.of(
-                new PlayerDto("p1", "SpecificAlias", "icon-1", true)
+                new PlayerDto("p1", "SpecificAlias", "icon-1", true, false)
         );
         ExportRequest request = createChainRequest(entries, players);
-        when(gifEncoder.encode(any(Path.class))).thenReturn(new byte[]{1});
+        when(gifEncoder.encode(any(), anyList(), anyDouble(), anyInt(), anyInt())).thenReturn(new byte[]{1});
 
         // The test verifies no exception is thrown and the service successfully
         // resolves the player name from the players list. If name resolution
@@ -194,7 +196,7 @@ class ExportServiceTest {
         byte[] result = exportService.exportChain(request, "ABCD1234");
 
         assertNotNull(result);
-        verify(gifEncoder).encode(any(Path.class));
+        verify(gifEncoder).encode(any(), anyList(), anyDouble(), anyInt(), anyInt());
     }
 
     @Test
@@ -203,10 +205,10 @@ class ExportServiceTest {
                 new ChainEntryDto("unknown-player", "icon-1", "Mystery text", null, false)
         );
         List<PlayerDto> players = List.of(
-                new PlayerDto("p1", "Alice", "icon-1", true)
+                new PlayerDto("p1", "Alice", "icon-1", true, false)
         );
         ExportRequest request = createChainRequest(entries, players);
-        when(gifEncoder.encode(any(Path.class))).thenReturn(new byte[]{1});
+        when(gifEncoder.encode(any(), anyList(), anyDouble(), anyInt(), anyInt())).thenReturn(new byte[]{1});
 
         // Should not throw even though playerId doesn't match any player
         byte[] result = exportService.exportChain(request, "ABCD1234");
@@ -219,7 +221,7 @@ class ExportServiceTest {
         ExportRequest request = createThreeEntryChain();
 
         ArgumentCaptor<Path> pathCaptor = ArgumentCaptor.forClass(Path.class);
-        when(gifEncoder.encode(pathCaptor.capture())).thenReturn(new byte[]{1});
+        when(gifEncoder.encode(pathCaptor.capture(), anyList(), anyDouble(), anyInt(), anyInt())).thenReturn(new byte[]{1});
 
         exportService.exportChain(request, "ABCD1234");
 
@@ -232,7 +234,7 @@ class ExportServiceTest {
         ExportRequest request = createThreeEntryChain();
 
         ArgumentCaptor<Path> pathCaptor = ArgumentCaptor.forClass(Path.class);
-        when(gifEncoder.encode(pathCaptor.capture())).thenThrow(new IOException("FFmpeg failed"));
+        when(gifEncoder.encode(pathCaptor.capture(), anyList(), anyDouble(), anyInt(), anyInt())).thenThrow(new IOException("FFmpeg failed"));
 
         assertThrows(Exception.class, () -> exportService.exportChain(request, "ABCD1234"));
 
@@ -243,25 +245,25 @@ class ExportServiceTest {
     @Test
     void exportChain_GifEncoderThrows_PropagatesException() throws Exception {
         ExportRequest request = createThreeEntryChain();
-        when(gifEncoder.encode(any(Path.class))).thenThrow(new IOException("Encoding failed"));
+        when(gifEncoder.encode(any(), anyList(), anyDouble(), anyInt(), anyInt())).thenThrow(new IOException("Encoding failed"));
 
         assertThrows(Exception.class, () -> exportService.exportChain(request, "ABCD1234"));
     }
 
     @Test
-    void exportChain_WritesFrameListFile() throws Exception {
+    @SuppressWarnings("unchecked")
+    void exportChain_PassesNonEmptyFrameListToEncoder() throws Exception {
         ExportRequest request = createThreeEntryChain();
 
-        ArgumentCaptor<Path> pathCaptor = ArgumentCaptor.forClass(Path.class);
-        when(gifEncoder.encode(pathCaptor.capture())).thenAnswer(invocation -> {
-            Path tempDir = pathCaptor.getValue();
-            Path framesFile = tempDir.resolve("frames.txt");
-            assertTrue(Files.exists(framesFile), "frames.txt should exist before encoding");
-            String content = Files.readString(framesFile);
-            assertFalse(content.isBlank(), "frames.txt should not be empty");
-            return new byte[]{1};
-        });
+        ArgumentCaptor<List<FrameRenderer.FrameSpec>> framesCaptor = ArgumentCaptor.forClass(List.class);
+        when(gifEncoder.encode(any(), framesCaptor.capture(), anyDouble(), anyInt(), anyInt()))
+                .thenReturn(new byte[]{1});
 
         exportService.exportChain(request, "ABCD1234");
+
+        List<FrameRenderer.FrameSpec> frames = framesCaptor.getValue();
+        assertNotNull(frames, "Encoder should receive a frame list");
+        assertFalse(frames.isEmpty(), "Frame list should not be empty");
+        assertTrue(frames.stream().allMatch(f -> f.duration() > 0), "Every frame should have a positive duration");
     }
 }

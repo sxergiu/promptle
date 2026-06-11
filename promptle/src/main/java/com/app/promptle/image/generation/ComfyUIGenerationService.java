@@ -35,8 +35,9 @@ import java.util.concurrent.ThreadLocalRandom;
 public class ComfyUIGenerationService implements ImageGenerationService {
 
     private static final Logger log = LoggerFactory.getLogger(ComfyUIGenerationService.class);
-    private static final int MAX_POLL_ATTEMPTS = 240;
+    private static final int DEFAULT_POLL_TIMEOUT_SECONDS = 600;
 
+    private final int maxPollAttempts;
     private final RestTemplate restTemplate;
     private final ImageStorageService imageStorageService;
     private final ObjectMapper objectMapper;
@@ -47,6 +48,8 @@ public class ComfyUIGenerationService implements ImageGenerationService {
     private final long pollIntervalMs;
     private final String img2imgWorkflowTemplate;
     private final double img2imgDenoise;
+    private final double cfg;
+    private final double img2imgCfg;
     private final String img2imgLoadImageNodeId;
     private final String img2imgPromptNodeId;
     private final String img2imgOutputNodeId;
@@ -60,9 +63,12 @@ public class ComfyUIGenerationService implements ImageGenerationService {
                                     @Value("${image.generation.comfyui.output-node-id:9}") String outputNodeId,
                                     @Value("${image.generation.comfyui.img2img-workflow:#{null}}") String img2imgWorkflowResource,
                                     @Value("${image.generation.comfyui.img2img-denoise:0.55}") double img2imgDenoise,
+                                    @Value("${image.generation.comfyui.cfg:7}") double cfg,
+                                    @Value("${image.generation.comfyui.img2img-cfg:7}") double img2imgCfg,
                                     @Value("${image.generation.comfyui.img2img-load-image-node-id:10}") String img2imgLoadImageNodeId,
                                     @Value("${image.generation.comfyui.img2img-prompt-node-id:8}") String img2imgPromptNodeId,
-                                    @Value("${image.generation.comfyui.img2img-output-node-id:4}") String img2imgOutputNodeId) throws IOException {
+                                    @Value("${image.generation.comfyui.img2img-output-node-id:4}") String img2imgOutputNodeId,
+                                    @Value("${image.generation.comfyui.poll-timeout-seconds:600}") int pollTimeoutSeconds) throws IOException {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(5_000);
         factory.setReadTimeout(30_000);
@@ -73,7 +79,13 @@ public class ComfyUIGenerationService implements ImageGenerationService {
         this.promptNodeId = promptNodeId;
         this.outputNodeId = outputNodeId;
         this.pollIntervalMs = 1000L;
+        // Poll once per second up to this many seconds. Must exceed the worst-case TOTAL
+        // generation time for a round, since ComfyUI generates serially and all images for
+        // the round start polling at once (e.g. 8 players × ~60s each ≈ 480s).
+        this.maxPollAttempts = pollTimeoutSeconds;
         this.img2imgDenoise = img2imgDenoise;
+        this.cfg = cfg;
+        this.img2imgCfg = img2imgCfg;
         this.img2imgLoadImageNodeId = img2imgLoadImageNodeId;
         this.img2imgPromptNodeId = img2imgPromptNodeId;
         this.img2imgOutputNodeId = img2imgOutputNodeId;
@@ -109,8 +121,11 @@ public class ComfyUIGenerationService implements ImageGenerationService {
         this.outputNodeId = outputNodeId;
         this.workflowTemplate = workflowTemplate;
         this.pollIntervalMs = 0L;
+        this.maxPollAttempts = DEFAULT_POLL_TIMEOUT_SECONDS;
         this.img2imgWorkflowTemplate = img2imgWorkflowTemplate;
         this.img2imgDenoise = img2imgDenoise;
+        this.cfg = 7;
+        this.img2imgCfg = 7;
         this.img2imgLoadImageNodeId = img2imgLoadImageNodeId;
         this.img2imgPromptNodeId = img2imgPromptNodeId;
         this.img2imgOutputNodeId = img2imgOutputNodeId;
@@ -136,6 +151,7 @@ public class ComfyUIGenerationService implements ImageGenerationService {
                 if ("KSampler".equals(node.get("class_type"))) {
                     Map<String, Object> inputs = (Map<String, Object>) node.get("inputs");
                     inputs.put("seed", ThreadLocalRandom.current().nextLong(0, Long.MAX_VALUE));
+                    inputs.put("cfg", cfg);
                 }
             }
 
@@ -175,6 +191,7 @@ public class ComfyUIGenerationService implements ImageGenerationService {
                     Map<String, Object> inputs = (Map<String, Object>) node.get("inputs");
                     inputs.put("seed", ThreadLocalRandom.current().nextLong(0, Long.MAX_VALUE));
                     inputs.put("denoise", img2imgDenoise);
+                    inputs.put("cfg", img2imgCfg);
                 }
             }
 
@@ -202,7 +219,7 @@ public class ComfyUIGenerationService implements ImageGenerationService {
         log.info("ComfyUI accepted prompt — promptId={}", promptId);
 
         String gameId = UUID.randomUUID().toString();
-        for (int attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+        for (int attempt = 0; attempt < maxPollAttempts; attempt++) {
             Map<String, Object> history = restTemplate.getForObject(
                     comfyUiUrl + "/history/" + promptId, Map.class);
             if (history != null && history.containsKey(promptId)) {
@@ -221,11 +238,11 @@ public class ComfyUIGenerationService implements ImageGenerationService {
                 log.info("Image generated and stored — promptId={}, url={}", promptId, url);
                 return CompletableFuture.completedFuture(url);
             }
-            if (pollIntervalMs > 0 && attempt < MAX_POLL_ATTEMPTS - 1) {
+            if (pollIntervalMs > 0 && attempt < maxPollAttempts - 1) {
                 Thread.sleep(pollIntervalMs);
             }
         }
-        throw new RuntimeException("ComfyUI timed out after " + MAX_POLL_ATTEMPTS + " poll attempts");
+        throw new RuntimeException("ComfyUI timed out after " + maxPollAttempts + " poll attempts");
     }
 
     @SuppressWarnings("unchecked")

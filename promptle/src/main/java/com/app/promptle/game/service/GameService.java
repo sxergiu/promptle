@@ -51,6 +51,17 @@ public class GameService {
     private final ApplicationEventPublisher eventPublisher;
     private final long promptingSeconds;
     private final long guessingSeconds;
+    // Attention weight applied to the art-style text so it shapes the look without
+    // crowding out the player's actual prompt/guess. See promptle-docs/fine-tune.
+    private final double styleWeightFirstRound;
+    private final double styleWeightLaterRounds;
+    // Two equal generation modes for rounds 2+ (round 1 is always text-to-image):
+    //   image-to-image — seed each image from the previous one (visual lineage, but
+    //     leaks details the guesser never described; subtractive edits don't take).
+    //   text-to-image  — generate each round fresh from the guess text (faithful to
+    //     every prompt change incl. removals; no visual carry-over).
+    // See promptle-docs/fine-tune/cfg-denoise-style-discussion.md.
+    private final boolean imageToImageMode;
 
     // In-memory showcase counters per room (reset in startGame so repeat games in the same room start clean)
     private final Map<String, Integer> showcaseCounters = new ConcurrentHashMap<>();
@@ -67,7 +78,10 @@ public class GameService {
                        PromptFilter promptFilter,
                        ApplicationEventPublisher eventPublisher,
                        @Value("${game.timer.prompting-seconds:60}") long promptingSeconds,
-                       @Value("${game.timer.guessing-seconds:60}") long guessingSeconds) {
+                       @Value("${game.timer.guessing-seconds:60}") long guessingSeconds,
+                       @Value("${image.style.weight.first-round:0.45}") double styleWeightFirstRound,
+                       @Value("${image.style.weight.later-rounds:0.45}") double styleWeightLaterRounds,
+                       @Value("${image.generation.chain-mode:image-to-image}") String chainMode) {
         this.roomRepository = roomRepository;
         this.playerRepository = playerRepository;
         this.chainRepository = chainRepository;
@@ -81,6 +95,10 @@ public class GameService {
         this.eventPublisher = eventPublisher;
         this.promptingSeconds = promptingSeconds;
         this.guessingSeconds = guessingSeconds;
+        this.styleWeightFirstRound = styleWeightFirstRound;
+        this.styleWeightLaterRounds = styleWeightLaterRounds;
+        this.imageToImageMode = "image-to-image".equalsIgnoreCase(chainMode);
+        log.info("Image generation chain mode: {}", imageToImageMode ? "image-to-image" : "text-to-image");
     }
 
     @Transactional
@@ -139,7 +157,7 @@ public class GameService {
         timerService.startRoundTimer(roomCode, 1, promptingSeconds);
 
         List<PlayerDto> playerDtos = connected.stream()
-                .map(p -> new PlayerDto(p.getId().toString(), p.getAlias(), p.getAvatarId(), p.isConnected()))
+                .map(p -> new PlayerDto(p.getId().toString(), p.getAlias(), p.getAvatarId(), p.isConnected(), false))
                 .toList();
 
         eventPublisher.publishEvent(new RoomApplicationEvent(roomCode,
@@ -242,11 +260,11 @@ public class GameService {
             return;
         }
 
-        // Solo game: a single chain means there is nobody to guess for, so skip the
-        // GUESSING phase entirely and reveal the result immediately.
-        List<Chain> chains = chainRepository.findByRoom(room);
-        if (chains.size() == 1) {
-            log.info("[{}] onAllImagesReady: single-player game — going straight to RESULTS", roomCode);
+        // Final round generated: every chain now ends on an image, so reveal the results.
+        // Covers both the solo game (1 == 1, guessing skipped entirely) and the final
+        // img2img pass after the last guessing round (N == N).
+        if (room.getCurrentRound() == room.getTotalRounds()) {
+            log.info("[{}] onAllImagesReady: final round generated — going to RESULTS", roomCode);
             transitionToResults(room);
             return;
         }
@@ -320,6 +338,19 @@ public class GameService {
     }
 
     private void endPromptingRound(Room room) {
+        transitionToGenerating(room);
+    }
+
+    /**
+     * Always followed by a GENERATING pass — even after the final guessing round, so
+     * every chain ends on an image. onAllImagesReady then decides between the next
+     * GUESSING round and RESULTS based on currentRound vs totalRounds.
+     */
+    private void endGuessingRound(Room room) {
+        transitionToGenerating(room);
+    }
+
+    private void transitionToGenerating(Room room) {
         room.setPhase(GamePhase.GENERATING);
         roomRepository.save(room);
 
@@ -334,26 +365,10 @@ public class GameService {
         timerService.startGeneratingTimeout(room.getRoomCode(), room.getCurrentRound());
     }
 
-    private void endGuessingRound(Room room) {
-        if (room.getCurrentRound() == room.getTotalRounds()) {
-            transitionToResults(room);
-        } else {
-            room.setPhase(GamePhase.GENERATING);
-            roomRepository.save(room);
-
-            eventPublisher.publishEvent(new PhaseChangedApplicationEvent(
-                    room.getRoomCode(), GamePhase.GENERATING, room.getCurrentRound(),
-                    room.getTotalRounds(), 0, Instant.now().toEpochMilli()));
-            eventPublisher.publishEvent(new StartImageGenerationEvent(room.getRoomCode()));
-
-            timerService.startGeneratingTimeout(room.getRoomCode(), room.getCurrentRound());
-        }
-    }
-
     /**
-     * Moves the room into RESULTS and publishes the final chain data. Shared by the
-     * normal multi-player path (last guessing round) and the solo path (after the
-     * single image is generated, with no guessing round).
+     * Moves the room into RESULTS and publishes the final chain data. Reached from
+     * onAllImagesReady once the final round's images are generated — the last
+     * guessing round in multiplayer, or the single prompt round in a solo game.
      */
     private void transitionToResults(Room room) {
         room.setPhase(GamePhase.RESULTS);
@@ -394,10 +409,16 @@ public class GameService {
                                 return CompletableFuture.completedFuture(null);
                             }
                             String style = chain.getStyle();
-                            String decorated = entry.getText() + (style != null && !style.isBlank() ? ", " + style + " style" : "");
+                            double styleWeight = room.getCurrentRound() == 1
+                                    ? styleWeightFirstRound
+                                    : styleWeightLaterRounds;
+                            String decorated = entry.getText()
+                                    + (style != null && !style.isBlank()
+                                        ? ", (" + style + " style:" + styleWeight + ")"
+                                        : "");
 
                             byte[] previousImageBytes = null;
-                            if (room.getCurrentRound() > 1) {
+                            if (imageToImageMode && room.getCurrentRound() > 1) {
                                 ChainEntry prevEntry = chainEntryRepository
                                         .findByChainAndRound(chain, room.getCurrentRound() - 1)
                                         .orElse(null);

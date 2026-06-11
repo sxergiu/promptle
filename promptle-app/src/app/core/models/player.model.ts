@@ -3,4 +3,5 @@ export interface PlayerDto {
   alias: string;
   avatarId: string;
   connected: boolean;
+  returnedToLobby?: boolean;
 }

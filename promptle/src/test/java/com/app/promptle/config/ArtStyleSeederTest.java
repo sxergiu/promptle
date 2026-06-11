@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.ApplicationArguments;
@@ -23,9 +24,7 @@ class ArtStyleSeederTest {
     @InjectMocks private ArtStyleSeeder artStyleSeeder;
 
     @Test
-    void run_InsertsDefaultStyles_WhenTableIsEmpty() throws Exception {
-        when(artStyleRepository.count()).thenReturn(0L);
-
+    void run_InsertsDefaultStyles() throws Exception {
         artStyleSeeder.run(applicationArguments);
 
         ArgumentCaptor<ArtStyle> captor = ArgumentCaptor.forClass(ArtStyle.class);
@@ -37,11 +36,14 @@ class ArtStyleSeederTest {
     }
 
     @Test
-    void run_DoesNotInsert_WhenTableAlreadyHasStyles() throws Exception {
-        when(artStyleRepository.count()).thenReturn(5L);
-
+    void run_WipesExistingStylesBeforeReseeding() throws Exception {
         artStyleSeeder.run(applicationArguments);
 
-        verify(artStyleRepository, never()).save(any());
+        // Reseeds fresh on every boot so phrasing changes take effect on redeploy:
+        // the wipe (deleteAllInBatch, to avoid a unique-constraint clash) must happen
+        // before the inserts.
+        InOrder inOrder = inOrder(artStyleRepository);
+        inOrder.verify(artStyleRepository).deleteAllInBatch();
+        inOrder.verify(artStyleRepository, times(12)).save(any());
     }
 }

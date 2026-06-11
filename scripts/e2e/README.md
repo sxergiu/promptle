@@ -1,14 +1,27 @@
 # Promptle 2-player simulation
 
 Drives a full 2-player Promptle game through the real UI with Playwright and
-saves a screenshot of every screen the **host** sees, in **both light and dark
-mode**. The second player is a bot, driven just enough to advance each phase.
+saves a screenshot of every screen the **host** sees, at **three viewports**
+(desktop, mobile portrait, mobile landscape) in **both light and dark mode**.
+The second player is a bot, driven just enough to advance each phase.
 
 ## What it captures
 
-`screenshots/` (cleared each run), numbered in order. Every screen is captured
-twice — `<NN>-<label>-light.png` and `<NN>-<label>-dark.png` (the host flips the
-`data-theme` attribute and re-snaps the same screen):
+`screenshots/` (cleared each run) holds one folder per flow —
+`<viewport>-<theme>`, where `<viewport>` is one of `desktop` (1280×900),
+`mobile-portrait` (390×844), `mobile-landscape` (844×390) and `<theme>` is
+`light` or `dark`:
+
+```
+screenshots/
+  desktop-light/          desktop-dark/
+  mobile-portrait-light/  mobile-portrait-dark/
+  mobile-landscape-light/ mobile-landscape-dark/
+```
+
+Each folder contains the same set of screens, numbered in order as
+`<NN>-<label>.png` (the host resizes the viewport and flips the `data-theme`
+attribute, re-snapping the same screen into each folder):
 
 1. `home` — player setup / create room
 2. `lobby-host-alone` — host in lobby before guest joins
@@ -43,7 +56,7 @@ npx ng serve
 ## Run
 
 ```bash
-cd scripts/sim-2player
+cd scripts/e2e
 npm run setup    # once — installs playwright + chromium
 npm run sim
 ```

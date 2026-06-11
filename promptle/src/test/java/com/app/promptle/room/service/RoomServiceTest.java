@@ -699,6 +699,116 @@ class RoomServiceTest {
         assertTrue(hasReset);
     }
 
+    // ---- markReturnedToLobby ----
+
+    @Test
+    void markReturnedToLobby_PublishesPlayerReturnedEvent_WithReturnedFlagOnPlayer() {
+        Room room = buildRoomWithPhase("ABCD1234", GamePhase.RESULTS);
+        Player p1 = buildPlayer(room);
+        p1.setConnected(true);
+        Player p2 = buildPlayer(room);
+        p2.setConnected(true);
+
+        when(playerRepository.findByToken(p1.getToken())).thenReturn(Optional.of(p1));
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(p1, p2));
+        when(playerRepository.findByRoom(room)).thenReturn(List.of(p1, p2));
+
+        roomService.markReturnedToLobby("ABCD1234", p1.getToken().toString());
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher, atLeastOnce()).publishEvent(captor.capture());
+        Optional<RoomApplicationEvent> returnedEvent = captor.getAllValues().stream()
+                .filter(e -> e instanceof RoomApplicationEvent)
+                .map(e -> (RoomApplicationEvent) e)
+                .filter(e -> "PLAYER_RETURNED".equals(e.payload().type().toString()))
+                .findFirst();
+        assertTrue(returnedEvent.isPresent(), "Expected a PLAYER_RETURNED room event");
+        // The full roster rides along, with only the returning player flagged.
+        assertEquals(2, returnedEvent.get().payload().players().size());
+        assertTrue(returnedEvent.get().payload().players().stream()
+                .filter(dto -> dto.id().equals(p1.getId().toString()))
+                .allMatch(dto -> dto.returnedToLobby()));
+        assertTrue(returnedEvent.get().payload().players().stream()
+                .filter(dto -> dto.id().equals(p2.getId().toString()))
+                .noneMatch(dto -> dto.returnedToLobby()));
+    }
+
+    @Test
+    void markReturnedToLobby_AllConnectedReturned_PublishesGameReset_NotPlayerReturned() {
+        Room room = buildRoomWithPhase("ABCD1234", GamePhase.RESULTS);
+        Player p1 = buildPlayer(room);
+        p1.setConnected(true);
+
+        when(playerRepository.findByToken(p1.getToken())).thenReturn(Optional.of(p1));
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(p1));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of());
+        when(playerRepository.findByRoomAndConnectedFalse(room)).thenReturn(List.of());
+
+        roomService.markReturnedToLobby("ABCD1234", p1.getToken().toString());
+
+        assertEquals(GamePhase.LOBBY, room.getPhase());
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher, atLeastOnce()).publishEvent(captor.capture());
+        List<String> roomEventTypes = captor.getAllValues().stream()
+                .filter(e -> e instanceof RoomApplicationEvent)
+                .map(e -> ((RoomApplicationEvent) e).payload().type().toString())
+                .toList();
+        assertTrue(roomEventTypes.contains("GAME_RESET"), "Expected GAME_RESET when the last player returns");
+        assertFalse(roomEventTypes.contains("PLAYER_RETURNED"), "GAME_RESET supersedes PLAYER_RETURNED");
+    }
+
+    // ---- RESULTS / GENERATING snapshot contract ----
+
+    @Test
+    void getGameStateSnapshot_resultsPhase_ReturnsFullRoster_IncludingDisconnected_WithReturnedFlags() {
+        Room room = buildRoomWithPhase("ABCD1234", GamePhase.RESULTS);
+        Player p1 = buildPlayer(room);
+        p1.setConnected(true);
+        Player p2 = buildPlayer(room);
+        p2.setConnected(true);
+        Player p3 = buildPlayer(room);
+        p3.setConnected(false); // briefly dropped while navigating — must still appear
+
+        when(playerRepository.findByToken(p1.getToken())).thenReturn(Optional.of(p1));
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(p1, p2));
+        when(playerRepository.findByRoom(room)).thenReturn(List.of(p1, p2, p3));
+
+        // p1 returns first (seeds the in-memory returned set), then fetches the snapshot.
+        roomService.markReturnedToLobby("ABCD1234", p1.getToken().toString());
+        GameStateSnapshot snapshot = roomService.getGameStateSnapshot("ABCD1234", p1.getToken().toString());
+
+        assertEquals(GamePhase.RESULTS, snapshot.phase());
+        assertEquals(3, snapshot.players().size(), "RESULTS snapshot must contain the full game roster");
+        assertTrue(snapshot.players().stream()
+                .filter(dto -> dto.id().equals(p1.getId().toString()))
+                .allMatch(dto -> dto.returnedToLobby()));
+        assertTrue(snapshot.players().stream()
+                .filter(dto -> !dto.id().equals(p1.getId().toString()))
+                .noneMatch(dto -> dto.returnedToLobby()));
+    }
+
+    @Test
+    void getGameStateSnapshot_generatingPhase_ReturnsPhaseAndRound_NullImage_ZeroTimer() {
+        Room room = buildRoomWithPhase("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(2);
+        room.setTotalRounds(2); // the final image pass
+        Player player = buildPlayer(room);
+
+        when(playerRepository.findByToken(player.getToken())).thenReturn(Optional.of(player));
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(player));
+
+        GameStateSnapshot snapshot = roomService.getGameStateSnapshot("ABCD1234", player.getToken().toString());
+
+        assertEquals(GamePhase.GENERATING, snapshot.phase());
+        assertEquals(2, snapshot.currentRound());
+        assertEquals(0L, snapshot.timerSeconds());
+        assertEquals(0L, snapshot.serverTimestamp());
+        assertNull(snapshot.imageUrl());
+    }
+
     // ---- Helpers ----
 
     private Room buildLobbyRoom(String code) {

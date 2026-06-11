@@ -15,6 +15,9 @@
           <img src="app-icons/promptle-crown.svg" alt="Host" class="crown" />
         }
         <span class="player-alias">{{ alias }}</span>
+        @if (isCurrentPlayer) {
+          <span class="me-badge">ME</span>
+        }
       </div>
     </div>
 

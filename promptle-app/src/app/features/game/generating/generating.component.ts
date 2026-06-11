@@ -1,4 +1,5 @@
-import { Component, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { SoundService } from '../../../core/services/sound.service';
 import {
   PixelCell,
   buildGrid,
@@ -33,6 +34,8 @@ interface Particle {
 })
 export class GeneratingComponent implements OnInit, OnDestroy {
   gridCols = GRID_COLS;
+
+  private readonly sound = inject(SoundService);
 
   cells = signal<PixelCell[]>(buildGrid());
   currentMessage = signal('');
@@ -103,15 +106,15 @@ export class GeneratingComponent implements OnInit, OnDestroy {
     this.timers.push(t);
 
     switch (index) {
-      case 0: this.effectStatic(); break;
-      case 1: this.effectPixelRain(); break;
-      case 2: this.effectRipple(); break;
+      case 0: this.sound.fxStatic(); this.effectStatic(); break;
+      case 1: this.sound.fxPixelRain(); this.effectPixelRain(); break;
+      case 2: this.sound.fxRipple(); this.effectRipple(); break;
       case 3: this.triggerRing(); break;
-      case 4: this.effectBlackout(); break;
-      case 5: this.effectScreenToggle(); break;
-      case 6: this.effectHeartbeat(); break;
-      case 7: this.effectDisco(); break;
-      case 8: this.effectReverseWave(); break;
+      case 4: this.sound.fxBlackout(); this.effectBlackout(); break;
+      case 5: this.sound.fxScreenToggle(this.screenOff()); this.effectScreenToggle(); break;
+      case 6: this.sound.fxHeartbeat(); this.effectHeartbeat(); break;
+      case 7: this.sound.fxDisco(); this.effectDisco(); break;
+      case 8: this.sound.fxReverseWave(); this.effectReverseWave(); break;
     }
   }
 
@@ -293,14 +296,16 @@ export class GeneratingComponent implements OnInit, OnDestroy {
 
   // ── Core animations ──
 
-  private triggerRing(): void {
+  private triggerRing(withSound = true): void {
     if (this.ringing()) return;
+    if (withSound) this.sound.phoneRing();
     this.ringing.set(true);
     const t = setTimeout(() => this.ringing.set(false), 600);
     this.timers.push(t);
   }
 
   private popCell(index: number): void {
+    this.sound.cellPop();
     const neighbors = getScreenNeighborIndices(index);
     const { palette } = randomPalette(-1);
 
@@ -381,7 +386,7 @@ export class GeneratingComponent implements OnInit, OnDestroy {
     const scheduleRing = () => {
       const delay = 12000 + Math.random() * 6000;
       const t = setTimeout(() => {
-        this.triggerRing();
+        this.triggerRing(false); // ambient auto-ring stays silent; only taps sound
         scheduleRing();
       }, delay);
       this.timers.push(t);

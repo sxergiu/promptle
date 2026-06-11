@@ -7,6 +7,43 @@ export interface PlayerSetupSubmit {
   avatarId: string;
 }
 
+export interface InfoSection {
+  key: string;
+  label: string;
+  title: string;
+  body: string[];
+}
+
+const INFO_SECTIONS: InfoSection[] = [
+  {
+    key: 'how-to-play',
+    label: 'How to Play',
+    title: 'How to Play',
+    body: [
+      'Invite some friends, lock in your ideas, generate images, guess prompts — and on it goes.',
+      'Watch the creations of Promptle unfold before you.',
+    ],
+  },
+  {
+    key: 'terms',
+    label: 'Terms of Service',
+    title: 'Terms of Service',
+    body: [
+      'A party game, provided as-is and just for fun. This is a placeholder text. So it all fits nicely.',
+      'Play with people you trust. Not many options.',
+    ],
+  },
+  {
+    key: 'safety',
+    label: 'Usage Safety',
+    title: 'Usage Safety',
+    body: [
+      'Prompts are filtered to block explicit content. We work to keep generated images appropriate.',
+      'Images which might be found inappropriate are on you.',
+    ],
+  },
+];
+
 /**
  * Shared "set up your player" screen used by both Home (create) and Join.
  * Owns the brand, avatar picker and name field; the parent supplies the
@@ -27,6 +64,17 @@ export class PlayerSetupComponent implements OnInit {
   readonly alias = signal('');
   readonly aliasRejected = signal(false);
   diceSpinning = false;
+
+  readonly infoSections = INFO_SECTIONS;
+  readonly activeSection = signal<InfoSection | null>(null);
+
+  toggleSection(section: InfoSection): void {
+    this.activeSection.set(this.activeSection() === section ? null : section);
+  }
+
+  closeSection(): void {
+    this.activeSection.set(null);
+  }
 
   private readonly _selectedIcon = signal<PlayerIcon>(PLAYER_ICONS[0]);
 

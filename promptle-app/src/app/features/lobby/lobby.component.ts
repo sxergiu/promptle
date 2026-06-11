@@ -1,10 +1,12 @@
 import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 
 import { RoomApiService } from '../../core/services/room-api.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { PlayerService } from '../../core/services/player.service';
+import { SoundService } from '../../core/services/sound.service';
 import { PlayerCardComponent } from '../../shared/components/player-card/player-card.component';
 import { PlayerDto } from '../../core/models/player.model';
 import { GameStateSnapshot, RoomEvent } from '../../core/models/events.model';
@@ -12,6 +14,12 @@ import { GamePhase } from '../../core/models/game-phase.enum';
 import { StompSubscription } from '@stomp/stompjs';
 
 const DUPLICATE_TAB_TIMEOUT_MS = 50;
+// Self-healing roster reconciliation. The lobby roster updates live from room
+// broadcasts, but if a single PLAYER_JOINED/RETURNED event is ever missed (a
+// transient WS hiccup on a host whose tab stays foregrounded), the returning
+// player would stay invisible forever. Re-fetching the snapshot on a slow timer
+// converges any such desync within seconds, on both the host and the newcomer.
+const RECONCILE_INTERVAL_MS = 8000;
 
 @Component({
   selector: 'app-lobby',
@@ -35,8 +43,10 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   private channel: BroadcastChannel | null = null;
   private duplicateCheckTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconcileTimer: ReturnType<typeof setInterval> | null = null;
   private _roomSub: StompSubscription | null = null;
   private initialized = false;
+  private destroyed = false;
   // Self-heal: if a GAME_RESET is ever missed, the lobby would stay stuck showing
   // "waiting for results" with Start disabled. Re-fetching the snapshot whenever the
   // tab regains focus recovers from any such missed event.
@@ -55,6 +65,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
     private roomApiService: RoomApiService,
     private webSocketService: WebSocketService,
     private playerService: PlayerService,
+    private sound: SoundService,
   ) {}
 
   ngOnInit(): void {
@@ -93,11 +104,14 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     document.removeEventListener('visibilitychange', this.onVisible);
+    this.stopReconcilePoll();
     if (this.duplicateCheckTimer !== null) {
       clearTimeout(this.duplicateCheckTimer);
     }
     this.channel?.close();
+    this._roomSub?.unsubscribe();
     if (!this.duplicateSession() && !this.navigatingToGame) {
       this.webSocketService.disconnect();
     }
@@ -106,14 +120,22 @@ export class LobbyComponent implements OnInit, OnDestroy {
   private initializeLobby(): void {
     this.initialized = true;
     this.refreshSnapshot();
+    this.startReconcilePoll();
 
     // Reuses the live connection handed off from the results showcase when present;
     // otherwise (direct navigation / refresh) opens a fresh one.
     this.webSocketService.connect(this.playerToken, this.roomCode, () => {
+      // The mid-game auto-join in applySnapshot can destroy this component before
+      // the WS handshake completes — don't subscribe on behalf of a dead lobby.
+      if (this.destroyed) return;
       this._roomSub?.unsubscribe();
       this._roomSub = this.webSocketService.subscribe(`/topic/room/${this.roomCode}`, (event: unknown) => {
         const roomEvent = event as RoomEvent;
-        if (roomEvent.type === 'PLAYER_JOINED' || roomEvent.type === 'PLAYER_LEFT' || roomEvent.type === 'HOST_CHANGED') {
+        if (roomEvent.type === 'PLAYER_JOINED' || roomEvent.type === 'PLAYER_LEFT' || roomEvent.type === 'HOST_CHANGED' || roomEvent.type === 'PLAYER_RETURNED') {
+          // Roster deltas only fire here (post-handshake), so this never sounds for the
+          // local player's own join — that broadcast precedes this subscription.
+          if (roomEvent.type === 'PLAYER_JOINED') this.sound.playerJoined();
+          else if (roomEvent.type === 'PLAYER_LEFT') this.sound.playerLeft();
           this.players.set(roomEvent.players);
           this.hostId.set(roomEvent.hostId);
         } else if (roomEvent.type === 'GAME_RESET') {
@@ -122,6 +144,9 @@ export class LobbyComponent implements OnInit, OnDestroy {
           this.hostId.set(roomEvent.hostId);
           this.waitingForResults.set(false);
         } else if (roomEvent.type === 'GAME_STARTED') {
+          // startGame() may have already navigated this client on its REST success.
+          if (this.navigatingToGame) return;
+          this.sound.gameStarted();
           this.navigatingToGame = true;
           this._roomSub?.unsubscribe();
           this.router.navigate(['/game', this.roomCode]);
@@ -129,13 +154,45 @@ export class LobbyComponent implements OnInit, OnDestroy {
       });
 
       // Re-fetch after subscribing to catch any events missed during the handshake.
+      // This callback re-runs on every (re)connect, so a socket that dropped while the
+      // tab was backgrounded re-subscribes and re-syncs once the phone comes back.
       this.refreshSnapshot();
-    }, 0);
+    }, 5000);
+  }
+
+  private startReconcilePoll(): void {
+    if (this.reconcileTimer !== null) return;
+    this.reconcileTimer = setInterval(() => {
+      // Only reconcile while the tab is foregrounded — backgrounded tabs already
+      // re-sync on the visibilitychange handler when they return, and polling a
+      // hidden tab is wasted work.
+      if (document.visibilityState === 'visible' && !this.navigatingToGame) {
+        this.refreshSnapshot();
+      }
+    }, RECONCILE_INTERVAL_MS);
+  }
+
+  private stopReconcilePoll(): void {
+    if (this.reconcileTimer !== null) {
+      clearInterval(this.reconcileTimer);
+      this.reconcileTimer = null;
+    }
   }
 
   private refreshSnapshot(): void {
     this.roomApiService.getGameStateSnapshot(this.roomCode, this.playerToken).subscribe({
       next: (state) => this.applySnapshot(state),
+      error: (err: unknown) => {
+        // Invalid token / room gone (4xx) — the only kick-home case. Transient
+        // network failures (status 0, e.g. a phone resuming with the radio still
+        // down) and server errors must not destroy the session; the next
+        // visibilitychange refetch recovers instead.
+        const status = err instanceof HttpErrorResponse ? err.status : 0;
+        if (status >= 400 && status < 500) {
+          this.playerService.clearLocalStorage(this.roomCode);
+          this.router.navigate(['/']);
+        }
+      },
     });
   }
 
@@ -147,12 +204,18 @@ export class LobbyComponent implements OnInit, OnDestroy {
       // Returned to the lobby ahead of others still viewing results — wait for them.
       this.waitingForResults.set(true);
     } else if (state.phase !== GamePhase.LOBBY) {
-      // A game is already underway (stale/late client) — can't rejoin it.
-      this.playerService.clearLocalStorage(this.roomCode);
-      this.router.navigate(['/']);
+      // A game is already underway (e.g. GAME_STARTED was missed) — auto-join it.
+      this.navigatingToGame = true;
+      this._roomSub?.unsubscribe();
+      this.router.navigate(['/game', this.roomCode]);
     } else {
       this.waitingForResults.set(false);
     }
+  }
+
+  /** Fresh lobby → everyone is "returned"; during a results wait, only flagged players are. */
+  isPlayerReturned(p: PlayerDto): boolean {
+    return !this.waitingForResults() || p.returnedToLobby === true;
   }
 
   // -- Actions --
@@ -189,6 +252,17 @@ export class LobbyComponent implements OnInit, OnDestroy {
     if (this.starting()) return;
     this.starting.set(true);
     this.roomApiService.startGame(this.roomCode, this.playerToken).subscribe({
+      // Navigate as soon as the start succeeds rather than waiting for the GAME_STARTED
+      // broadcast — a host whose socket silently dropped (mobile backgrounding) would
+      // otherwise never receive it and stay locked here while everyone else plays. The
+      // game component fetches its own snapshot on load, so a direct nav is safe. The
+      // navigatingToGame guard keeps the later broadcast from double-navigating.
+      next: () => {
+        if (this.navigatingToGame) return;
+        this.navigatingToGame = true;
+        this._roomSub?.unsubscribe();
+        this.router.navigate(['/game', this.roomCode]);
+      },
       error: () => this.starting.set(false),
     });
   }

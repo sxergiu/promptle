@@ -1,5 +1,6 @@
 package com.app.promptle.room.web;
 
+import com.app.promptle.room.service.DisconnectGraceService;
 import com.app.promptle.room.service.RoomService;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
@@ -12,16 +13,19 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Stub — fully implemented in a later chunk.
- * Listens for WebSocket disconnect events and delegates to RoomService.
+ * Listens for WebSocket connect/disconnect events. Connects apply immediately;
+ * disconnects are deferred through {@link DisconnectGraceService} so a brief
+ * mobile background doesn't make a player (or the host) vanish from the room.
  */
 @Component
 public class WebSocketSessionListener {
 
     private final RoomService roomService;
+    private final DisconnectGraceService disconnectGraceService;
 
-    public WebSocketSessionListener(RoomService roomService) {
+    public WebSocketSessionListener(RoomService roomService, DisconnectGraceService disconnectGraceService) {
         this.roomService = roomService;
+        this.disconnectGraceService = disconnectGraceService;
     }
 
     @EventListener
@@ -31,6 +35,9 @@ public class WebSocketSessionListener {
             return;
         }
         UUID playerId = UUID.fromString(principal.getName());
+
+        // Cancel any disconnect still inside its grace window — the player is back.
+        disconnectGraceService.cancelPending(playerId);
 
         Map<String, Object> sessionAttributes = SimpMessageHeaderAccessor
                 .getSessionAttributes(event.getMessage().getHeaders());
@@ -61,6 +68,8 @@ public class WebSocketSessionListener {
         if (roomCode == null) {
             return;
         }
-        roomService.playerDisconnected(roomCode, playerId);
+        // Defer the real disconnect — a brief background (e.g. opening the share
+        // sheet) reconnects within the grace window and cancels this.
+        disconnectGraceService.scheduleDisconnect(roomCode, playerId);
     }
 }

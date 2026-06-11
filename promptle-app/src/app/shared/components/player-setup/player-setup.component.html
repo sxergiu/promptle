@@ -1,5 +1,12 @@
 <div class="screen-shell">
   <div class="tv-frame">
+    <div class="neon-sign neon-sign--welcome" aria-hidden="true">
+      <span class="neon-sign__text">
+        <span class="ta-line"><span class="lit-r fx-a">D</span><span class="dead">o</span><span class="ta-gap"></span><span class="dead">y</span><span class="lit-g fx-a">o</span><span class="dead">u</span><span class="ta-gap"></span><span class="dead">w</span><span class="lit-r fx-b">a</span><span class="dead">n</span><span class="lit-g fx-b">t</span></span>
+        <span class="ta-line"><span class="lit-r fx-c">t</span><span class="dead">o</span><span class="ta-gap"></span><span class="dead">p</span><span class="lit-g fx-c">l</span><span class="dead">a</span><span class="lit-r fx-d">y</span></span>
+        <span class="ta-line"><span class="lit-g fx-d">a</span><span class="ta-gap"></span><span class="dead">g</span><span class="dead">a</span><span class="lit-r fx-a">m</span><span class="lit-g fx-b">e</span><span class="dead">?</span></span>
+      </span>
+    </div>
     <div class="tv-screen">
       <div class="setup">
         <div class="brand">
@@ -7,54 +14,79 @@
           <p class="tagline">The Telepromptle</p>
         </div>
 
-        <div class="identity-row">
-          <div class="avatar-section">
-            <img [src]="selectedIcon.path" [alt]="selectedIcon.id" class="avatar-img" />
+        @if (activeSection(); as section) {
+          <div class="info-panel">
             <button
               type="button"
-              class="shuffle-badge"
-              (click)="shuffleIcon()"
-              (mouseenter)="diceSpinning = true"
-              (mouseleave)="diceSpinning = false"
-              aria-label="Shuffle avatar"
-            >
-              <img src="app-icons/promptle-shuffle.svg" alt="" class="dice-icon" [class.spinning]="diceSpinning" />
-            </button>
+              class="info-close"
+              (click)="closeSection()"
+              aria-label="Close"
+            >×</button>
+            <div class="info-content">
+              <h2 class="info-title">{{ section.title }}</h2>
+              @for (paragraph of section.body; track $index) {
+                <p class="info-body">{{ paragraph }}</p>
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="identity-row">
+            <div class="avatar-section">
+              <img [src]="selectedIcon.path" [alt]="selectedIcon.id" class="avatar-img" />
+              <button
+                type="button"
+                class="shuffle-badge"
+                (click)="shuffleIcon()"
+                (mouseenter)="diceSpinning = true"
+                (mouseleave)="diceSpinning = false"
+                aria-label="Shuffle avatar"
+              >
+                <img src="app-icons/promptle-shuffle.svg" alt="" class="dice-icon" [class.spinning]="diceSpinning" />
+              </button>
+            </div>
+
+            <div class="identity-fields">
+              <input
+                class="name-input"
+                type="text"
+                [value]="alias()"
+                (input)="onAliasInput($event)"
+                (keydown.enter)="onPlay()"
+                [class.rejected]="aliasRejected()"
+                placeholder="Who are you?"
+                aria-label="Your name"
+                maxlength="13"
+              />
+              <button
+                type="button"
+                class="btn-cta btn-play"
+                [disabled]="!alias().trim() || busy"
+                (click)="onPlay()"
+              >
+                <img src="app-icons/promptle-play.svg" class="btn-icon" alt="" />
+                PLAY
+              </button>
+            </div>
           </div>
 
-          <div class="identity-fields">
-            <input
-              class="name-input"
-              type="text"
-              [value]="alias()"
-              (input)="onAliasInput($event)"
-              (keydown.enter)="onPlay()"
-              [class.rejected]="aliasRejected()"
-              placeholder="Who are you?"
-              aria-label="Your name"
-              maxlength="13"
-            />
-            <button
-              type="button"
-              class="btn-cta btn-play"
-              [disabled]="!alias().trim() || busy"
-              (click)="onPlay()"
-            >
-              <img src="app-icons/promptle-play.svg" class="btn-icon" alt="" />
-              PLAY
-            </button>
-          </div>
-        </div>
-
-        @if (errorMessage) {
-          <div class="error-message">{{ errorMessage }}</div>
+          @if (errorMessage) {
+            <div class="error-message">{{ errorMessage }}</div>
+          }
         }
       </div>
     </div>
     <footer class="setup-footer tv-label-footer">
-      <a href="#" class="footer-link">How to Play</a>
-      <a href="#" class="footer-link">About</a>
-      <a href="#" class="footer-link">Privacy Policy</a>
+      @for (section of infoSections; track section.key) {
+        @if (!$first) {
+          <span class="footer-dot" aria-hidden="true"></span>
+        }
+        <button
+          type="button"
+          class="footer-link"
+          [class.active]="activeSection() === section"
+          (click)="toggleSection(section)"
+        >{{ section.label }}</button>
+      }
     </footer>
   </div>
 </div>

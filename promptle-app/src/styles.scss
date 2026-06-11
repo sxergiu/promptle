@@ -64,6 +64,12 @@ html {
   --bg-blob-2: rgba(55, 145, 80, 0.20);
   --bg-blob-3: rgba(215, 135, 45, 0.16);
   --bg-blob-4: rgba(110, 60, 180, 0.14);
+  // Neon "Time is running out" sign — themed on the brand crimson/sage.
+  // Light core with a crimson halo so it reads as a lit gas tube.
+  --neon-core: #fff2f6;       // hot inner glow (near-white, pink-tinged)
+  --neon-hue: 153, 0, 48;     // crimson (#990030) halo
+  --neon-accent: 98, 130, 102; // sage green secondary glow
+  --neon-dead: rgba(74, 60, 52, 0.34); // unlit tube — faint grey
   --bg-blob-5: rgba(210, 70, 110, 0.11);
   --bg-blob-6: rgba(45, 155, 140, 0.14);
   --bg-grain-opacity: 0.03;
@@ -128,6 +134,12 @@ html {
   --bg-blob-5: rgba(220, 80, 130, 0.10);
   --bg-blob-6: rgba(40, 180, 160, 0.12);
   --bg-grain-opacity: 0.05;
+
+  // Neon pops harder on the dark charcoal bg — same brand crimson halo.
+  --neon-core: #fff2f6;
+  --neon-hue: 204, 51, 88;
+  --neon-accent: 60, 160, 90;
+  --neon-dead: rgba(255, 255, 255, 0.16);
 
   // Room page gradient (muted dark versions)
   --room-bg-gradient: linear-gradient(135deg, #2a1519 0%, #151f18 100%);
@@ -464,6 +476,9 @@ app-root {
   box-sizing: border-box;
   @include bp.sm { padding: 18px; border-radius: 28px; }
   @include bp.md { max-width: 720px; padding: 20px; border-radius: 32px; }
+  // Landscape is height-constrained — slim the bezel (esp. the bottom band) so the
+  // frame isn't taller than it needs to be and doesn't reach the corner toggles.
+  @include bp.landscape { padding: 8px; border-radius: 16px; }
 }
 
 :root {
@@ -493,6 +508,7 @@ app-root {
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.25);
   @include bp.sm { padding-top: 10px; font-size: 0.7rem; }
+  @include bp.landscape { padding-top: 4px; font-size: 0.6rem; }
 }
 
 // Centered page shell — use on every screen
@@ -502,11 +518,217 @@ app-root {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem 0.75rem;
+  // Reserve a bottom band so bottom-edge controls (the lobby Start row — which
+  // grows taller with the "waiting for results" note — and the results buttons)
+  // clear the fixed bottom-right sound/theme toggles instead of sitting under
+  // them. The toggles sit ~1rem–3rem up from the viewport bottom. Landscape below.
+  padding: 1.5rem 0.75rem calc(0.75rem + 3rem + env(safe-area-inset-bottom));
   box-sizing: border-box;
   overflow: hidden;
-  @include bp.sm { padding: 2rem 1rem; }
-  @include bp.landscape { padding: 0.75rem; }
+  @include bp.sm { padding: 2rem 1rem calc(1rem + 3.25rem + env(safe-area-inset-bottom)); }
+  // Landscape is height-constrained and the bottom controls (lobby Start, the
+  // game ready-pips, results buttons) reach the bottom-right corner where the
+  // fixed sound/theme toggles float. Reserve a bottom band so content lifts clear
+  // of the toggles instead of sitting under them.
+  @include bp.landscape {
+    padding: 0.75rem;
+    // Reserve a right band too: the fixed sound/theme toggles float in the
+    // bottom-right corner, so push the centred frame left of them (otherwise the
+    // lobby's wide frame and the guessing frame slide under the toggle cluster).
+    padding-right: calc(0.75rem + 3.25rem + env(safe-area-inset-right));
+    padding-bottom: calc(0.75rem + 2.25rem + env(safe-area-inset-bottom));
+  }
+}
+
+// ── Neon gas-tube sign ────────────────────────────────────────────────────────
+// A subtle, mostly-dead neon sign. Most letters are unlit grey; a few still glow,
+// alternating the brand red/green (same as the home logo) and flickering like a
+// worn tube. Shared across screens — the look is identical everywhere; each page
+// only positions it differently via a --modifier. Hidden in landscape.
+.neon-sign {
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+  animation: neonPowerOn 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  @include bp.landscape { display: none; }
+}
+
+.neon-sign__text {
+  display: flex;
+  flex-direction: column;
+  font-family: 'Press Start 2P', monospace;
+  font-weight: 400;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  text-transform: uppercase;
+  // Pixel font is already wide — a touch of tracking keeps tubes distinct
+  letter-spacing: 0.04em;
+  // Dead tube by default — faint grey, no glow
+  color: var(--neon-dead);
+  animation: neonHum 3.4s linear infinite;
+  @include bp.sm { font-size: 1.05rem; }
+}
+
+.ta-line { display: block; white-space: nowrap; }
+
+// Explicit inter-word gap — Angular strips whitespace-only text nodes between
+// the per-letter spans, so a real space char never survives compilation.
+.ta-gap { display: inline-block; width: 0.5em; }
+
+// Lit letters — these are the tubes with a working light behind them. They rest
+// grey (a dead tube) like every other letter, then flicker up to their brand
+// red/green with a matching halo and fade back to grey, cycling forever. Each
+// runs its colour-cycle keyframes; the .fx-* classes only stagger the timing so
+// no two letters light in step, making the glow travel around the sign.
+// display:inline-block isolates each letter's glow.
+.lit-r,
+.lit-g {
+  display: inline-block;
+  // Rest state: unlit grey, no halo (matches .dead)
+  color: var(--neon-dead);
+}
+
+.lit-r { animation: cycle-r var(--neon-dur, 5.2s) ease-in-out var(--neon-delay, 0s) infinite; }
+.lit-g { animation: cycle-g var(--neon-dur, 5.2s) ease-in-out var(--neon-delay, 0s) infinite; }
+
+// Per-letter stagger. CRITICAL: every variant shares the SAME duration, so the
+// phase relationship between letters is fixed forever and never drifts — the
+// only difference is a delay that spaces them evenly around one cycle (0, ¼, ½,
+// ¾). Combined with the wide lit-window in cycle-r/cycle-g (~18%→84%), any
+// colour that uses ≥3 of these 4 variants is lit somewhere at every instant, so
+// red and green are always both on — no awkward all-one-colour moment. (Earlier
+// these had distinct durations, which drifts out of phase and produces exactly
+// that.) Assignment in the markup guarantees each colour spans the variants.
+.fx-a { --neon-dur: 5.4s; --neon-delay: 0s;    }
+.fx-b { --neon-dur: 5.4s; --neon-delay: 1.35s; }
+.fx-c { --neon-dur: 5.4s; --neon-delay: 2.7s;  }
+.fx-d { --neon-dur: 5.4s; --neon-delay: 4.05s; }
+
+// ── Position modifiers — same sign, different corner per page ──
+// Game (PROMPTING): top-right, poking above the TV frame.
+.neon-sign--game {
+  top: -5.1rem;
+  right: 3rem;
+  .neon-sign__text { align-items: flex-end; text-align: right; }
+}
+
+// Home / join (welcome): top-left, poking above the TV frame.
+.neon-sign--welcome {
+  top: -5.1rem;
+  left: 3rem;
+  .neon-sign__text { align-items: flex-start; text-align: left; }
+}
+
+// Loading (generating): laid out in flow to the right of the phone (see
+// .phone-float, which is a centred flex row) — the phone + label move as one
+// unit and bob together, so the sign never clips regardless of viewport. Unlike
+// the other signs it also stays visible in landscape.
+.neon-sign--loading {
+  position: static;
+  .neon-sign__text { align-items: flex-start; text-align: left; }
+  @include bp.landscape { display: block; }
+}
+
+// Power-on: a couple of stutters before the tube settles, like a real sign
+@keyframes neonPowerOn {
+  0%   { opacity: 0; }
+  10%  { opacity: 0.85; }
+  12%  { opacity: 0.1; }
+  18%  { opacity: 0.95; }
+  21%  { opacity: 0.2; }
+  30%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+@keyframes neonHum {
+  0%, 100% { filter: brightness(1); }
+  46%      { filter: brightness(1); }
+  48%      { filter: brightness(0.9); }
+  50%      { filter: brightness(1.03); }
+  52%      { filter: brightness(0.93); }
+  54%      { filter: brightness(1); }
+}
+
+// ── Colour-cycle keyframes — grey → lit → grey ──────────────────────────────
+// A letter rests as a dead grey tube most of the cycle, then warms up to its
+// brand colour with a worn-tube stutter, holds the glow briefly, and fades back
+// to grey. text-shadow keeps the same 3-layer shape at every step (zero-alpha
+// when off) so the halo interpolates smoothly instead of popping in. The two
+// keyframes are identical apart from the colour + glow hue.
+@keyframes cycle-r {
+  0%, 12% {
+    color: var(--neon-dead);
+    text-shadow:
+      0 0 0 rgba(var(--neon-hue), 0),
+      0 0 0 rgba(var(--neon-hue), 0),
+      0 0 0 rgba(var(--neon-hue), 0);
+  }
+  18%, 23% {                     // strike + stutter as the tube warms up
+    color: var(--color-primary);
+    text-shadow:
+      0 0 5px rgba(var(--neon-hue), 0.95),
+      0 0 12px rgba(var(--neon-hue), 0.8),
+      0 0 26px rgba(var(--neon-hue), 0.5);
+  }
+  20% {                          // brief sputter mid-strike
+    color: var(--neon-dead);
+    text-shadow:
+      0 0 2px rgba(var(--neon-hue), 0.35),
+      0 0 4px rgba(var(--neon-hue), 0.25),
+      0 0 8px rgba(var(--neon-hue), 0.15);
+  }
+  78% {                          // hold full glow — wide window so phases overlap
+    color: var(--color-primary);
+    text-shadow:
+      0 0 5px rgba(var(--neon-hue), 0.95),
+      0 0 12px rgba(var(--neon-hue), 0.8),
+      0 0 26px rgba(var(--neon-hue), 0.5);
+  }
+  84%, 100% {                    // fade back to a dead tube
+    color: var(--neon-dead);
+    text-shadow:
+      0 0 0 rgba(var(--neon-hue), 0),
+      0 0 0 rgba(var(--neon-hue), 0),
+      0 0 0 rgba(var(--neon-hue), 0);
+  }
+}
+
+@keyframes cycle-g {
+  0%, 12% {
+    color: var(--neon-dead);
+    text-shadow:
+      0 0 0 rgba(var(--neon-accent), 0),
+      0 0 0 rgba(var(--neon-accent), 0),
+      0 0 0 rgba(var(--neon-accent), 0);
+  }
+  18%, 23% {
+    color: var(--p-green);
+    text-shadow:
+      0 0 5px rgba(var(--neon-accent), 0.95),
+      0 0 12px rgba(var(--neon-accent), 0.8),
+      0 0 26px rgba(var(--neon-accent), 0.5);
+  }
+  20% {
+    color: var(--neon-dead);
+    text-shadow:
+      0 0 2px rgba(var(--neon-accent), 0.35),
+      0 0 4px rgba(var(--neon-accent), 0.25),
+      0 0 8px rgba(var(--neon-accent), 0.15);
+  }
+  78% {
+    color: var(--p-green);
+    text-shadow:
+      0 0 5px rgba(var(--neon-accent), 0.95),
+      0 0 12px rgba(var(--neon-accent), 0.8),
+      0 0 26px rgba(var(--neon-accent), 0.5);
+  }
+  84%, 100% {
+    color: var(--neon-dead);
+    text-shadow:
+      0 0 0 rgba(var(--neon-accent), 0),
+      0 0 0 rgba(var(--neon-accent), 0),
+      0 0 0 rgba(var(--neon-accent), 0);
+  }
 }
 
 // ── Inline button icon ──────────────────────────────────────────────────────
@@ -606,14 +828,26 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
 }
 
-// ── Theme toggle ───────────────────────────────────────────────────────────────
+// ── Corner toggles (sound + theme) ──────────────────────────────────────────────
+// Fixed cluster in the bottom-right; sound sits to the left of the theme switch.
 
-.theme-toggle {
+.corner-toggles {
   position: fixed;
   bottom: calc(1rem + env(safe-area-inset-bottom));
   right: calc(1rem + env(safe-area-inset-right));
   z-index: 1050;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   @include bp.sm { bottom: calc(1.5rem + env(safe-area-inset-bottom)); right: calc(1.5rem + env(safe-area-inset-right)); }
+  @include bp.landscape {
+    bottom: calc(0.5rem + env(safe-area-inset-bottom));
+    right: calc(0.5rem + env(safe-area-inset-right));
+    gap: 0.55rem;
+  }
+}
+
+.corner-toggle {
   width: 2rem;
   height: 2rem;
   cursor: pointer;
@@ -635,11 +869,54 @@ body {
   }
 
   @include bp.landscape {
-    bottom: calc(0.5rem + env(safe-area-inset-bottom));
-    right: calc(0.5rem + env(safe-area-inset-right));
     width: 1.5rem;
     height: 1.5rem;
   }
+}
+
+// Transient "Sound ON/OFF" confirmation — pops above the cluster on toggle,
+// colour-coded (green on / red off) for instant state feedback, then fades.
+.sound-label {
+  position: absolute;
+  // Sit higher above the cluster and centre on the sound icon (the leftmost
+  // 2rem item, so its centre is 1rem from the cluster's left edge).
+  bottom: calc(100% + 0.9rem);
+  left: 1rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--p-red);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  transform: translateX(-50%) translateY(5px) scale(0.96);
+  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+
+  &--on { background: var(--p-green); }
+
+  &--show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+
+  // Landscape shrinks the icons to 1.5rem, so its centre moves to 0.75rem.
+  @include bp.landscape { left: 0.75rem; }
+}
+
+// The sound glyph is a dark pixel icon — readable as-is on the light bg, but it
+// needs flipping light on the dark theme (the theme icon swaps art instead).
+[data-theme='dark'] .sound-toggle {
+  filter: invert(1) brightness(0.95);
+
+  @media (hover: hover) {
+    &:hover { filter: invert(1) brightness(1.3); }
+  }
+  &:active { filter: invert(1) brightness(1.5); }
 }
 
 // ── Reduced motion ─────────────────────────────────────────────────────────────

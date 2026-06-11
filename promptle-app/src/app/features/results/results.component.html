@@ -10,13 +10,13 @@
               @for (chain of chains(); track $index) {
                 @if ($index === currentChainIndex()) {
                   @for (entry of chain.entries; track $index; let i = $index) {
-                    @if (i < revealedEntryCount()) {
+                    @if (isTextRevealed(i)) {
                       <div class="entry-row">
                         <div class="entry-bubble-wrap">
                           @if (entry.avatarId) {
-                            <img [src]="getAvatarPath(entry.avatarId)" class="entry-avatar" [alt]="entry.avatarId" />
+                            <img [src]="getAvatarPath(entry.avatarId)" class="entry-avatar" [class.settled]="isTextSettled(i)" [alt]="entry.avatarId" />
                           } @else {
-                            <div class="entry-avatar"></div>
+                            <div class="entry-avatar" [class.settled]="isTextSettled(i)"></div>
                           }
                           <div class="entry-content">
                             <div class="entry-bubble" [class.placeholder-bubble]="entry.isPlaceholder">
@@ -26,23 +26,59 @@
                               <div class="entry-author">
                                 {{ getPlayerName(entry.playerId) }}
                               </div>
-                              {{ entry.text }}
+                              {{ displayedText(i, entry.text) }}@if (isTyping(i)) {<span class="type-caret"></span>}
                             </div>
                           </div>
                         </div>
                       </div>
-                      @if (entry.imageUrl) {
-                        <div class="entry-row entry-row--image">
-                          <div class="entry-bubble-wrap entry-bubble-wrap--right">
-                            <div class="entry-content entry-content--right">
-                              <div class="entry-image-bubble">
-                                <img [src]="entry.imageUrl" class="entry-image" alt="Generated image" />
-                              </div>
+                    }
+                    @if (entry.imageUrl && isImageRevealed(i)) {
+                      <div class="entry-row entry-row--image">
+                        <div class="entry-bubble-wrap entry-bubble-wrap--right">
+                          <div class="entry-content entry-content--right">
+                            <div class="entry-image-bubble">
+                              <img [src]="entry.imageUrl" class="entry-image" alt="Generated image" (load)="onImageLoaded()" />
                             </div>
-                            <img src="logos.ico" class="entry-avatar entry-avatar--app" alt="Promptle" />
+                          </div>
+                          <img src="logos.ico" class="entry-avatar entry-avatar--app" [class.settled]="isImageSettled(i)" alt="Promptle" />
+                        </div>
+                      </div>
+                    }
+                  }
+
+                  @if (visiblePendingStep(); as pending) {
+                    @if (pending.kind === 'text') {
+                      <!-- Next player's message is "being typed" -->
+                      <div class="entry-row entry-row--typing">
+                        <div class="entry-bubble-wrap">
+                          @if (chain.entries[pending.entryIndex].avatarId) {
+                            <img [src]="getAvatarPath(chain.entries[pending.entryIndex].avatarId!)" class="entry-avatar" alt="" />
+                          } @else {
+                            <div class="entry-avatar"></div>
+                          }
+                          <div class="entry-content">
+                            <div class="entry-bubble typing-bubble" aria-label="Typing…">
+                              <span class="typing-dot"></span>
+                              <span class="typing-dot"></span>
+                              <span class="typing-dot"></span>
+                            </div>
                           </div>
                         </div>
-                      }
+                      </div>
+                    } @else {
+                      <!-- Promptle is "drawing" the next image -->
+                      <div class="entry-row entry-row--typing entry-row--image">
+                        <div class="entry-bubble-wrap entry-bubble-wrap--right">
+                          <div class="entry-content entry-content--right">
+                            <div class="entry-bubble typing-bubble typing-bubble--image" aria-label="Drawing…">
+                              <span class="typing-dot"></span>
+                              <span class="typing-dot"></span>
+                              <span class="typing-dot"></span>
+                            </div>
+                          </div>
+                          <img src="logos.ico" class="entry-avatar entry-avatar--app" alt="Promptle" />
+                        </div>
+                      </div>
                     }
                   }
                 }
@@ -76,14 +112,13 @@
         </div>
 
         <div class="results-actions">
-          <div class="chain-dots">
+          <div class="chain-dots" [class.chain-dots--showcase]="!allChainsCompleted()">
             @for (chain of chains(); track $index; let i = $index) {
               <div class="dot"
                    [class.active]="i === currentChainIndex()"
-                   [class.done]="i < currentChainIndex()"
-                   [class.clickable]="i < currentChainIndex() || allChainsCompleted()"
+                   [class.clickable]="allChainsCompleted()"
                    (click)="navigateToChain(i)"
-                   [attr.data-tooltip]="(i < currentChainIndex() || allChainsCompleted()) ? 'Chain ' + (i + 1) : null">
+                   [attr.data-tooltip]="allChainsCompleted() ? 'Chain ' + (i + 1) : null">
               </div>
             }
           </div>
