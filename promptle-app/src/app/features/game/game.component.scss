@@ -1,5 +1,8 @@
 @use 'breakpoints' as bp;
 
+// Neon "Time is running out" sign lives in global styles.scss (.neon-sign,
+// .neon-sign--game) so the home/loading screens can reuse the same look.
+
 /* -- Status bar (on bezel) -- */
 .game-status-bar {
   display: flex;
@@ -49,6 +52,20 @@
   animation: alarmRing 0.6s ease-in-out infinite;
 }
 
+// Initial attention pulse: when PROMPTING opens, the clock breathes a few times
+// to reinforce the "Time is running out" sign, then settles. Finite iteration
+// count means it plays once on mount and stops — the .warning alarm (more
+// specific) takes over if the timer later runs low.
+.btn-icon--attn {
+  transform-origin: 50% 60%;
+  animation: timerAttention 0.85s ease-in-out 4;
+}
+
+@keyframes timerAttention {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(2); }
+}
+
 @keyframes timerFlash {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
@@ -93,7 +110,9 @@
 
 /* -- Phase area -- */
 .game-phase {
-  padding: 1.5rem 0.5rem;
+  // Portrait guessing wants breathing room on the sides for the ready count,
+  // button and input field, so keep a comfortable horizontal pad here.
+  padding: 1.5rem 1rem;
   animation: phaseFadeIn 0.35s ease;
   display: flex;
   flex-direction: column;
@@ -102,12 +121,14 @@
   @include bp.landscape { padding: 0.75rem 0.5rem; }
 }
 
-/* Prompting phase — trim the side padding so the title/subtitle, field,
-   counter and button stretch closer to the screen edges (frame unchanged). */
+/* Prompting phase — portrait gets generous side padding so the content inside
+   the tv screen isn't flush against the edges; wider/landscape screens trim it
+   back since they have less vertical room and a roomier frame. */
 .game-phase--flush {
-  padding-left: 0;
-  padding-right: 0;
-  @include bp.sm { padding-left: 0.25rem; padding-right: 0.25rem; }
+  padding-left: 1rem;
+  padding-right: 1rem;
+  @include bp.sm { padding-left: 0.5rem; padding-right: 0.5rem; }
+  @include bp.landscape { padding-left: 0.5rem; padding-right: 0.5rem; }
 }
 
 @keyframes phaseFadeIn {

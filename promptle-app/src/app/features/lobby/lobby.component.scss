@@ -42,11 +42,13 @@
 // -- Content --
 
 .lobby-content {
-  padding: 1.5rem 1rem;
+  padding: 1.25rem 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  // Portrait stacks the CTA buttons in a column, so keep the inter-section gap
+  // tight to leave room for them above the corner toggles.
+  gap: 1rem;
   @include bp.sm { padding: 2rem 1.25rem; gap: 2rem; }
   @include bp.landscape { padding: 0.75rem 0.75rem; gap: 0.75rem; }
 }
@@ -130,22 +132,39 @@
 
 .lobby-cta-row {
   display: flex;
-  gap: 0.75rem;
+  // Mobile portrait: stack the buttons in a column. Source order is LEAVE, INVITE,
+  // START, so use `order` to present them INVITE → START → EXIT top-to-bottom.
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
   width: 100%;
-  justify-content: space-between;
+  // Wider screens (and landscape, which is height-constrained) revert to a single
+  // row laid out in source order.
+  @include bp.sm { flex-direction: row; justify-content: space-between; gap: 0.75rem; }
+  @include bp.landscape { flex-direction: row; justify-content: space-between; }
 
-  .btn-secondary {
-    flex: 0 0 auto;
+  .btn-invite { order: 1; }
+  .btn-start  { order: 2; }
+  .btn-leave  { order: 3; }
+  @include bp.sm {
+    .btn-leave, .btn-invite, .btn-start { order: 0; }
+  }
+  @include bp.landscape {
+    .btn-leave, .btn-invite, .btn-start { order: 0; }
   }
 
-  // LEAVE and START share an equal width
+  .btn-secondary {
+    @include bp.sm { flex: 0 0 auto; }
+  }
+
+  // LEAVE and START share an equal width on the row layout
   .btn-leave,
   .btn-start {
-    flex: 0 0 8rem;
+    @include bp.sm { flex: 0 0 8rem; }
   }
 
   .btn-invite {
-    flex: 1 1 auto;
+    @include bp.sm { flex: 1 1 auto; }
   }
 }
 

@@ -8,6 +8,7 @@
           [readOnly]="submitted()"
           [value]="promptText()"
           (input)="promptText.set($any($event.target).value)"
+          (keydown.enter)="$event.preventDefault(); onSubmit()"
           placeholder="A cat riding a rocket to the moon…"
         ></textarea>
         @if (submitted()) {

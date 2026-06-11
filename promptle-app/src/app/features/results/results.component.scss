@@ -10,6 +10,7 @@
 
 /* -- Chain count title (centered on the bezel, above the screen) -- */
 .results-header {
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -45,21 +46,22 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.4rem;
   @include bp.sm { gap: 0.6rem; }
   @include bp.landscape { gap: 0.4rem; }
 }
 
 .dot {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   // Non-selected chains read red; the active ("you are here") chain is green.
   background: var(--color-primary);
   transition: background 0.35s, transform 0.35s, box-shadow 0.35s;
-  // Invisible padding for touch target (total ~24px)
-  outline: 6px solid transparent;
+  // Invisible padding for touch target (total ~28px at base, ~30px at sm)
+  outline: 7px solid transparent;
   outline-offset: 0;
+  @include bp.sm { width: 18px; height: 18px; outline-width: 6px; }
 }
 
 .dot.active {
@@ -69,9 +71,17 @@
   animation: dotBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-.dot.done {
-  // Viewed chains stay red but get a soft glow to set them apart from upcoming ones.
-  box-shadow: 0 0 6px color-mix(in srgb, var(--color-primary) 40%, transparent);
+// During the showcase every dot is muted and inert (bezel-relative grey, like
+// .btn-secondary); only the current chain reads app-red.
+.chain-dots--showcase .dot {
+  background: rgba(255, 255, 255, 0.18);
+  cursor: default;
+  pointer-events: none;
+}
+
+.chain-dots--showcase .dot.active {
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 25%, transparent);
 }
 
 .dot.clickable {
@@ -151,22 +161,23 @@
   flex-shrink: 0;
   background: var(--avatar-bg);
   // Neutral base border matches the avatar bg (the crimson/green identity ring
-  // below overrides it for player entries).
+  // below overrides it). Player + Promptle avatars read crimson while their
+  // message is typing/drawing, then ease to green once it lands (.settled).
   border: 2px solid var(--avatar-bg);
+  transition: border-color 0.5s ease, box-shadow 0.5s ease;
   @include bp.sm { width: 40px; height: 40px; }
 }
 
-.entry-avatar:not(.entry-avatar--app) {
+// "In progress" ring while the message types/draws.
+.entry-avatar:not(.settled) {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 15%, transparent);
-  animation: avatarSettle 0.4s ease 5s forwards;
 }
 
-@keyframes avatarSettle {
-  to {
-    border-color: var(--p-green);
-    box-shadow: 0 0 0 2px rgba(98, 130, 102, 0.2);
-  }
+// Settled ring once the typewriter finished / the image landed.
+.entry-avatar.settled {
+  border-color: var(--p-green);
+  box-shadow: 0 0 0 2px rgba(98, 130, 102, 0.2);
 }
 
 .entry-content {
@@ -223,6 +234,66 @@
   opacity: 0.5;
 }
 
+/* Typing indicator — the next message "being typed" (chat-style animated dots).
+   Reuses .entry-bubble so it sits exactly where the real message will land. */
+.typing-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.65rem 0.85rem;
+  min-height: 0;
+  @include bp.sm { padding: 0.75rem 1.1rem; }
+}
+
+.typing-bubble--image {
+  // Mirror the image bubble's right-corner shape and green identity.
+  border-radius: 14px 0 14px 14px;
+  border-color: var(--p-green);
+}
+
+.typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-on-surface);
+  opacity: 0.3;
+  animation: typingBlink 1.1s ease-in-out infinite;
+
+  &:nth-child(2) { animation-delay: 0.18s; }
+  &:nth-child(3) { animation-delay: 0.36s; }
+}
+
+.typing-bubble--image .typing-dot {
+  background: var(--p-green);
+}
+
+@keyframes typingBlink {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30%           { opacity: 1;   transform: translateY(-3px); }
+}
+
+/* Blinking caret at the end of the bubble currently being typewritten */
+.type-caret {
+  display: inline-block;
+  width: 2px;
+  height: 0.95em;
+  margin-left: 2px;
+  background: currentColor;
+  vertical-align: -0.12em;
+  animation: caretBlink 0.8s step-end infinite;
+}
+
+@keyframes caretBlink {
+  50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry-row { animation: none; }
+  .typing-dot { animation: none; opacity: 0.6; }
+  .entry-image-bubble { animation: none; }
+  .type-caret { animation: none; }
+}
+
 /* Right-aligned image row (sent by Promptle) */
 .entry-row--image {
   padding-left: 0 !important;
@@ -241,10 +312,8 @@
 }
 
 .entry-avatar--app {
-  // Background stays the shared --avatar-bg (inherited); the border matches the
-  // player avatars' settled green identity ring.
-  border-color: var(--p-green);
-  box-shadow: 0 0 0 2px rgba(98, 130, 102, 0.2);
+  // Background stays the shared --avatar-bg (inherited); the crimson/green
+  // identity ring is driven by .settled, same as the player avatars.
   object-fit: contain;
   padding: 3px;
 }
@@ -254,14 +323,16 @@
   overflow: hidden;
   box-shadow: 4px 4px 0 var(--p-green);
   border: 2px solid var(--p-green);
-  animation: imageFade 0.6s ease 0.15s both;
+  // "Develop" effect: the image sharpens from a blur, like it's being painted in.
+  animation: imageDevelop 0.7s ease-out 0.1s both;
   max-width: 100%;
   @include bp.sm { max-width: 360px; }
 }
 
-@keyframes imageFade {
-  from { opacity: 0; transform: scale(0.97); }
-  to   { opacity: 1; transform: scale(1); }
+@keyframes imageDevelop {
+  from { opacity: 0; filter: blur(14px); transform: scale(0.96); }
+  55%  { opacity: 1; }
+  to   { opacity: 1; filter: blur(0); transform: scale(1); }
 }
 
 .entry-image {
@@ -274,24 +345,29 @@
 
 /* -- Actions bar on the TV bezel: dots pinned left, buttons centered -- */
 .results-actions {
-  padding: 0.75rem 0.25rem 0;
+  // The whole frame is lifted clear of the fixed corner toggles by the global
+  // .screen-shell bottom padding (portrait + landscape), so the button row only
+  // needs ordinary internal padding here.
+  padding: 0.75rem 0.25rem;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  // Mobile: dots get the squeezable column, buttons keep their natural width.
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
   flex-shrink: 0;
-  @include bp.sm { padding: 1rem 0.5rem 0; }
+  @include bp.sm { padding: 1rem 0.5rem; grid-template-columns: 1fr auto 1fr; }
   @include bp.landscape { padding: 0.5rem 0.25rem 0; }
 
   .chain-dots { justify-self: start; }
 }
 
 .results-buttons {
-  grid-column: 3;
+  grid-column: 2;
   display: flex;
   align-items: center;
   gap: 0.75rem;
   justify-content: flex-end;
+  @include bp.sm { grid-column: 3; }
 
   > .btn-secondary { flex-shrink: 0; }
 }
@@ -419,4 +495,3 @@
     cursor: default;
   }
 }
-

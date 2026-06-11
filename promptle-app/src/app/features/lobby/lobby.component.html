@@ -25,6 +25,7 @@
                 [avatarId]="player.avatarId"
                 [isHost]="player.id === hostId()"
                 [isCurrentPlayer]="player.id === playerId"
+                [returned]="isPlayerReturned(player)"
                 size="large"
               />
             }

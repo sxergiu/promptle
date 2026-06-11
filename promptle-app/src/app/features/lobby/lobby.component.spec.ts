@@ -1,12 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { of, throwError } from 'rxjs';
 
 import { LobbyComponent } from './lobby.component';
 import { RoomApiService } from '../../core/services/room-api.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { PlayerService } from '../../core/services/player.service';
+import { SoundService } from '../../core/services/sound.service';
 import { GamePhase } from '../../core/models/game-phase.enum';
 
 describe('LobbyComponent', () => {
@@ -16,6 +18,7 @@ describe('LobbyComponent', () => {
   let wsSpy: jasmine.SpyObj<WebSocketService>;
   let playerServiceSpy: jasmine.SpyObj<PlayerService>;
   let routerSpy: jasmine.SpyObj<Router>;
+  let soundSpy: jasmine.SpyObj<SoundService>;
 
   const ROOM_CODE = 'LOBBY123';
   const PLAYER_TOKEN = 'player-tok-abc';
@@ -28,8 +31,9 @@ describe('LobbyComponent', () => {
 
     roomApiSpy = jasmine.createSpyObj('RoomApiService', ['getGameStateSnapshot', 'startGame']);
     wsSpy = jasmine.createSpyObj('WebSocketService', ['connect', 'disconnect', 'subscribe', 'send']);
-    playerServiceSpy = jasmine.createSpyObj('PlayerService', ['loadFromLocalStorage']);
+    playerServiceSpy = jasmine.createSpyObj('PlayerService', ['loadFromLocalStorage', 'clearLocalStorage']);
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    soundSpy = jasmine.createSpyObj('SoundService', ['playerJoined', 'playerLeft', 'gameStarted']);
 
     playerServiceSpy.loadFromLocalStorage.and.returnValue({
       playerToken: PLAYER_TOKEN,
@@ -68,6 +72,7 @@ describe('LobbyComponent', () => {
         { provide: WebSocketService, useValue: wsSpy },
         { provide: PlayerService, useValue: playerServiceSpy },
         { provide: Router, useValue: routerSpy },
+        { provide: SoundService, useValue: soundSpy },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -119,6 +124,8 @@ describe('LobbyComponent', () => {
     fixture.detectChanges();
 
     expect(component.players().length).toBe(3);
+    expect(soundSpy.playerJoined).toHaveBeenCalledTimes(1);
+    expect(soundSpy.playerLeft).not.toHaveBeenCalled();
   });
 
   it('PLAYER_LEFT event removes player from players signal', () => {
@@ -130,6 +137,8 @@ describe('LobbyComponent', () => {
     fixture.detectChanges();
 
     expect(component.players().length).toBe(1);
+    expect(soundSpy.playerLeft).toHaveBeenCalledTimes(1);
+    expect(soundSpy.playerJoined).not.toHaveBeenCalled();
   });
 
   it('HOST_CHANGED event updates hostId signal', () => {
@@ -151,6 +160,40 @@ describe('LobbyComponent', () => {
     });
 
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/game', ROOM_CODE]);
+    expect(soundSpy.gameStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it('startGame navigates to /game on success without waiting for the broadcast', () => {
+    roomApiSpy.startGame.and.returnValue(of(undefined));
+
+    component.startGame();
+
+    expect(roomApiSpy.startGame).toHaveBeenCalledWith(ROOM_CODE, PLAYER_TOKEN);
+    expect(routerSpy.navigate).toHaveBeenCalledWith(['/game', ROOM_CODE]);
+  });
+
+  it('startGame does not double-navigate when GAME_STARTED also arrives', () => {
+    roomApiSpy.startGame.and.returnValue(of(undefined));
+
+    component.startGame();
+    wsSubscriptionCallbacks[`/topic/room/${ROOM_CODE}`]({
+      type: 'GAME_STARTED',
+      players: [],
+      hostId: PLAYER_ID,
+    });
+
+    expect(routerSpy.navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('HOST_CHANGED event fires no join/leave cue', () => {
+    wsSubscriptionCallbacks[`/topic/room/${ROOM_CODE}`]({
+      type: 'HOST_CHANGED',
+      players: component.players(),
+      hostId: 'player-2',
+    });
+
+    expect(soundSpy.playerJoined).not.toHaveBeenCalled();
+    expect(soundSpy.playerLeft).not.toHaveBeenCalled();
   });
 
   // ---- Template ----
@@ -228,5 +271,158 @@ describe('LobbyComponent', () => {
   it('disconnects WebSocket on destroy', () => {
     component.ngOnDestroy();
     expect(wsSpy.disconnect).toHaveBeenCalled();
+  });
+
+  // ---- Return-from-results & mid-game snapshots ----
+
+  describe('return-from-results and mid-game snapshots', () => {
+    const RESULTS_PLAYERS = [
+      { id: PLAYER_ID, alias: 'Alice', avatarId: 'icon-1', connected: true, returnedToLobby: true },
+      { id: 'player-2', alias: 'Bob', avatarId: 'icon-2', connected: true, returnedToLobby: false },
+      { id: 'player-3', alias: 'Carol', avatarId: 'icon-3', connected: false, returnedToLobby: false },
+    ];
+
+    const resultsSnapshot = {
+      roomCode: ROOM_CODE,
+      phase: GamePhase.RESULTS,
+      currentRound: 3,
+      totalRounds: 3,
+      timerSeconds: 0,
+      serverTimestamp: 0,
+      imageUrl: null,
+      hasSubmitted: false,
+      submittedCount: 0,
+      players: RESULTS_PLAYERS,
+      hostId: PLAYER_ID,
+    };
+
+    // The outer beforeEach already created a lobby with a LOBBY snapshot; destroy it
+    // (closing its BroadcastChannel, which would otherwise PONG the new tab as a
+    // duplicate) and re-create with the stub set up by the calling test.
+    async function recreate(): Promise<void> {
+      fixture.destroy();
+      fixture = TestBed.createComponent(LobbyComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+      await new Promise<void>(resolve => setTimeout(resolve, 60));
+    }
+
+    it('RESULTS-phase snapshot shows the full game roster and the waiting note', async () => {
+      roomApiSpy.getGameStateSnapshot.and.returnValue(of(resultsSnapshot));
+      await recreate();
+
+      expect(component.players().length).toBe(3);
+      expect(component.waitingForResults()).toBeTrue();
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.textContent).toContain('Waiting for players');
+    });
+
+    it('PLAYER_RETURNED event marks returned cards is-returned and the rest is-away', async () => {
+      roomApiSpy.getGameStateSnapshot.and.returnValue(of(resultsSnapshot));
+      await recreate();
+
+      wsSubscriptionCallbacks[`/topic/room/${ROOM_CODE}`]({
+        type: 'PLAYER_RETURNED',
+        players: RESULTS_PLAYERS,
+        hostId: PLAYER_ID,
+      });
+      fixture.detectChanges();
+
+      const cards = (fixture.nativeElement as HTMLElement).querySelectorAll('app-player-card');
+      expect(cards[0].classList.contains('is-returned')).toBeTrue();
+      expect(cards[1].classList.contains('is-away')).toBeTrue();
+      expect(cards[2].classList.contains('is-away')).toBeTrue();
+    });
+
+    it('GAME_RESET clears the waiting-for-results state', async () => {
+      roomApiSpy.getGameStateSnapshot.and.returnValue(of(resultsSnapshot));
+      await recreate();
+      expect(component.waitingForResults()).toBeTrue();
+
+      wsSubscriptionCallbacks[`/topic/room/${ROOM_CODE}`]({
+        type: 'GAME_RESET',
+        players: RESULTS_PLAYERS.map(p => ({ ...p, returnedToLobby: false })),
+        hostId: PLAYER_ID,
+      });
+      fixture.detectChanges();
+
+      expect(component.waitingForResults()).toBeFalse();
+    });
+
+    it('in a fresh lobby every player counts as returned (all green)', () => {
+      expect(component.waitingForResults()).toBeFalse();
+      for (const p of component.players()) {
+        expect(component.isPlayerReturned(p)).toBeTrue();
+      }
+    });
+
+    it('mid-game snapshot auto-joins the running game instead of kicking home', async () => {
+      roomApiSpy.getGameStateSnapshot.and.returnValue(of({
+        ...resultsSnapshot,
+        phase: GamePhase.PROMPTING,
+        currentRound: 1,
+      }));
+      await recreate();
+
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/game', ROOM_CODE]);
+      expect(playerServiceSpy.clearLocalStorage).not.toHaveBeenCalled();
+    });
+
+    it('snapshot 4xx error clears storage and navigates home', async () => {
+      roomApiSpy.getGameStateSnapshot.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 409, statusText: 'Conflict' }))
+      );
+      await recreate();
+
+      expect(playerServiceSpy.clearLocalStorage).toHaveBeenCalledWith(ROOM_CODE);
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/']);
+    });
+
+    it('transient network error does not destroy the session', async () => {
+      roomApiSpy.getGameStateSnapshot.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 0, statusText: 'Unknown Error' }))
+      );
+      await recreate();
+
+      expect(playerServiceSpy.clearLocalStorage).not.toHaveBeenCalled();
+      expect(routerSpy.navigate).not.toHaveBeenCalledWith(['/']);
+    });
+  });
+
+  describe('roster reconciliation poll', () => {
+    afterEach(() => {
+      try { jasmine.clock().uninstall(); } catch { /* not installed */ }
+    });
+
+    it('re-fetches the snapshot on a timer to self-heal a missed roster event', () => {
+      // Tear down the real-timer component from the outer beforeEach, then drive a
+      // fresh one under a fake clock so we can advance past the reconcile interval.
+      fixture.destroy();
+      jasmine.clock().install();
+      fixture = TestBed.createComponent(LobbyComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+      jasmine.clock().tick(60); // pass the duplicate-tab check → initializeLobby + poll start
+
+      const callsAfterInit = roomApiSpy.getGameStateSnapshot.calls.count();
+      jasmine.clock().tick(8000); // one reconcile interval
+
+      expect(roomApiSpy.getGameStateSnapshot.calls.count()).toBeGreaterThan(callsAfterInit);
+    });
+
+    it('stops polling once the lobby is destroyed', () => {
+      fixture.destroy();
+      jasmine.clock().install();
+      fixture = TestBed.createComponent(LobbyComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+      jasmine.clock().tick(60);
+
+      fixture.destroy();
+      const callsAfterDestroy = roomApiSpy.getGameStateSnapshot.calls.count();
+      jasmine.clock().tick(8000);
+
+      expect(roomApiSpy.getGameStateSnapshot.calls.count()).toBe(callsAfterDestroy);
+    });
   });
 });

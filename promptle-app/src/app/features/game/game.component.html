@@ -4,11 +4,20 @@
         <app-generating></app-generating>
       } @else {
         <div class="tv-frame">
+          @if (phase() === GamePhase.PROMPTING) {
+            <div class="neon-sign neon-sign--game" aria-hidden="true">
+              <span class="neon-sign__text">
+                <span class="ta-line"><span class="lit-r fx-a">T</span><span class="dead">i</span><span class="dead">m</span><span class="lit-g fx-a">e</span><span class="ta-gap"></span><span class="lit-r fx-b">i</span><span class="lit-g fx-b">s</span></span>
+                <span class="ta-line"><span class="dead">r</span><span class="dead">u</span><span class="lit-r fx-c">n</span><span class="dead">n</span><span class="dead">i</span><span class="lit-g fx-c">n</span><span class="dead">g</span><span class="ta-gap"></span><span class="lit-r fx-d">o</span><span class="dead">u</span><span class="lit-g fx-d">t</span></span>
+              </span>
+            </div>
+          }
           @if (phase() !== GamePhase.LOBBY) {
             <div class="game-status-bar">
               <span class="round-badge">Round {{ currentRound() }} / {{ totalRounds() }}</span>
               <span class="timer-display" [class.warning]="remainingSeconds() <= 10 && remainingSeconds() > 0">
-                <img src="app-icons/promptle-timer.svg" class="btn-icon" alt="" />
+                <img src="app-icons/promptle-timer.svg" class="btn-icon"
+                     [class.btn-icon--attn]="phase() === GamePhase.PROMPTING" alt="" />
                 {{ remainingSeconds() }}s
               </span>
             </div>

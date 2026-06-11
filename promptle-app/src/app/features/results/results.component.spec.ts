@@ -8,6 +8,7 @@ import { ResultsComponent } from './results.component';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { PlayerService } from '../../core/services/player.service';
 import { RoomApiService } from '../../core/services/room-api.service';
+import { SoundService } from '../../core/services/sound.service';
 
 describe('ResultsComponent', () => {
   let component: ResultsComponent;
@@ -99,6 +100,7 @@ describe('ResultsComponent', () => {
 
   afterEach(() => {
     component.ngOnDestroy?.();
+    localStorage.removeItem('promptle_muted');
   });
 
   // ---- On mount ----
@@ -119,50 +121,239 @@ describe('ResultsComponent', () => {
     );
   });
 
-  // ---- Entry-by-entry reveal ----
+  // ---- Message-by-message reveal ----
 
-  it('revealedEntryCount increments by 1 on each interval tick', () => {
+  it('reveals one message at a time (text and image never appear together)', () => {
     jasmine.clock().install();
     try {
+      component.muted.set(true);
       component.chains.set(MOCK_CHAINS);
       component.currentChainIndex.set(0);
-      component.revealedEntryCount.set(0);
+      component.revealedStepCount.set(0);
       component.startRevealInterval();
 
-      jasmine.clock().tick(REVEAL_INTERVAL_MS);
-      expect(component.revealedEntryCount()).toBe(1);
+      // After the think delay: entry 0's text only — its image must not be visible yet.
+      jasmine.clock().tick(component.textThinkMs);
+      expect(component.revealedStepCount()).toBe(1);
+      expect(component.isTextRevealed(0)).toBeTrue();
+      expect(component.isImageRevealed(0)).toBeFalse();
 
-      jasmine.clock().tick(REVEAL_INTERVAL_MS);
-      expect(component.revealedEntryCount()).toBe(2);
+      // Finish typing + settle, then the image think delay: now entry 0's image.
+      const typingMs = MOCK_CHAINS[0].entries[0].text.length
+        * component.charIntervalFor(MOCK_CHAINS[0].entries[0].text.length);
+      jasmine.clock().tick(typingMs + component.textSettleMs + component.imageThinkMs);
+      expect(component.revealedStepCount()).toBe(2);
+      expect(component.isImageRevealed(0)).toBeTrue();
+      expect(component.isTextRevealed(1)).toBeFalse();
     } finally {
       component.ngOnDestroy();
       jasmine.clock().uninstall();
     }
   });
 
-  it('stops incrementing once all entries in current chain are revealed', () => {
+  it('stops once all messages in the current chain are revealed', () => {
     jasmine.clock().install();
     try {
+      component.muted.set(true);
       component.chains.set(MOCK_CHAINS);
       component.currentChainIndex.set(0);
-      component.revealedEntryCount.set(0);
+      component.revealedStepCount.set(0);
       component.startRevealInterval();
 
-      const totalEntries = MOCK_CHAINS[0].entries.length;
+      const totalSteps = component.stepsIn(MOCK_CHAINS[0]);
 
-      // Tick past all entries
-      jasmine.clock().tick(REVEAL_INTERVAL_MS * (totalEntries + 3));
+      // Tick far past the whole chain's reveal time
+      jasmine.clock().tick(60_000);
 
-      expect(component.revealedEntryCount()).toBe(totalEntries);
+      expect(component.revealedStepCount()).toBe(totalSteps);
+      expect(component.typing()).toBeNull();
     } finally {
       component.ngOnDestroy();
       jasmine.clock().uninstall();
     }
   });
 
-  it('uses environment showcaseRevealIntervalMs for the interval', () => {
-    // Verify the component uses the environment variable for interval
+  it('uses environment showcaseRevealIntervalMs as the pacing base', () => {
     expect(component.revealIntervalMs).toBe(REVEAL_INTERVAL_MS);
+    expect(component.stepIntervalMs).toBe(REVEAL_INTERVAL_MS / 2);
+  });
+
+  // ---- Typewriter ----
+
+  it('types text character by character after the bubble appears', () => {
+    jasmine.clock().install();
+    try {
+      component.muted.set(true);
+      component.chains.set(MOCK_CHAINS);
+      component.currentChainIndex.set(0);
+      component.revealedStepCount.set(0);
+      component.startRevealInterval();
+
+      jasmine.clock().tick(component.textThinkMs);
+      const text = MOCK_CHAINS[0].entries[0].text;
+      const charMs = component.charIntervalFor(text.length);
+      expect(component.isTyping(0)).toBeTrue();
+
+      jasmine.clock().tick(charMs * 3);
+      expect(component.displayedText(0, text)).toBe(text.slice(0, 3));
+
+      jasmine.clock().tick(charMs * text.length);
+      expect(component.typing()).toBeNull();
+      expect(component.displayedText(0, text)).toBe(text);
+    } finally {
+      component.ngOnDestroy();
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it('caps the per-character delay so long texts still type quickly', () => {
+    expect(component.charIntervalFor(8)).toBe(component.typeMsPerChar);
+    expect(component.charIntervalFor(500)).toBe(16);
+    // Total typing time for a long text stays near the cap, not length × full delay.
+    expect(500 * component.charIntervalFor(500)).toBeLessThanOrEqual(component.maxTypingMs * 3);
+  });
+
+  it('hides the typing dots while a bubble is typewriting', () => {
+    jasmine.clock().install();
+    try {
+      component.muted.set(true);
+      component.chains.set(MOCK_CHAINS);
+      component.currentChainIndex.set(0);
+      component.revealedStepCount.set(0);
+      component.startRevealInterval();
+
+      jasmine.clock().tick(component.textThinkMs);
+      expect(component.typing()).not.toBeNull();
+      expect(component.visiblePendingStep()).toBeNull();
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.typing-bubble')).toBeFalsy();
+    } finally {
+      component.ngOnDestroy();
+      jasmine.clock().uninstall();
+    }
+  });
+
+  // ---- Sound / haptics ----
+
+  it('SoundService.toggle flips the shared mute signal and persists it', () => {
+    const sound = TestBed.inject(SoundService);
+    sound.muted.set(false);
+    sound.toggle();
+    expect(component.muted()).toBeTrue(); // component mirrors the shared signal
+    expect(localStorage.getItem('promptle_muted')).toBe('1');
+    sound.toggle();
+    expect(component.muted()).toBeFalse();
+    expect(localStorage.getItem('promptle_muted')).toBe('0');
+  });
+
+  it('vibrates on message reveal, but not while muted', () => {
+    if (!('vibrate' in navigator)) {
+      pending('Vibration API not supported in this browser');
+      return;
+    }
+    const vibrateSpy = spyOn(navigator, 'vibrate');
+    jasmine.clock().install();
+    try {
+      component.chains.set(MOCK_CHAINS);
+      component.currentChainIndex.set(0);
+
+      component.muted.set(true);
+      component.revealedStepCount.set(0);
+      component.startRevealInterval();
+      jasmine.clock().tick(component.textThinkMs);
+      expect(vibrateSpy).not.toHaveBeenCalled();
+
+      component.muted.set(false);
+      component.revealedStepCount.set(0);
+      component.startRevealInterval();
+      jasmine.clock().tick(component.textThinkMs);
+      expect(vibrateSpy).toHaveBeenCalled();
+    } finally {
+      component.ngOnDestroy();
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it('plays a typeTick per (throttled) keystroke while typewriting, but not while muted', () => {
+    const sound = TestBed.inject(SoundService);
+    const tick = spyOn(sound, 'typeTick');
+    jasmine.clock().install();
+    try {
+      component.chains.set(MOCK_CHAINS);
+      component.currentChainIndex.set(0);
+
+      // Muted: no keystroke ticks.
+      component.muted.set(true);
+      component.revealedStepCount.set(0);
+      component.startRevealInterval();
+      const text = MOCK_CHAINS[0].entries[0].text;
+      const charMs = component.charIntervalFor(text.length);
+      jasmine.clock().tick(component.textThinkMs);
+      jasmine.clock().tick(charMs * text.length);
+      expect(tick).not.toHaveBeenCalled();
+
+      // Unmuted: ticks fire as the bubble types out.
+      component.muted.set(false);
+      component.revealedStepCount.set(0);
+      component.startRevealInterval();
+      jasmine.clock().tick(component.textThinkMs);
+      jasmine.clock().tick(charMs * text.length);
+      expect(tick).toHaveBeenCalled();
+    } finally {
+      component.ngOnDestroy();
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it('plays the imageBlip cue when an image bubble is revealed', () => {
+    const sound = TestBed.inject(SoundService);
+    const blip = spyOn(sound, 'imageBlip');
+    jasmine.clock().install();
+    try {
+      component.muted.set(false);
+      component.chains.set(MOCK_CHAINS);
+      component.currentChainIndex.set(0);
+      // Entry 0's text is revealed; its image is the next pending step.
+      component.revealedStepCount.set(1);
+      component.startRevealInterval();
+      jasmine.clock().tick(component.imageThinkMs);
+      expect(blip).toHaveBeenCalledTimes(1);
+    } finally {
+      component.ngOnDestroy();
+      jasmine.clock().uninstall();
+    }
+  });
+
+  // ---- Typing indicator ----
+
+  it('shows a typing indicator for the next text message while revealing', () => {
+    component.revealedStepCount.set(0);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const typing = compiled.querySelector('.typing-bubble');
+    expect(typing).toBeTruthy();
+    expect(typing!.classList.contains('typing-bubble--image')).toBeFalse();
+  });
+
+  it('shows the image-style typing indicator while the next image is pending', () => {
+    // Entry 0's text revealed; its image is the pending step.
+    component.revealedStepCount.set(1);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const typing = compiled.querySelector('.typing-bubble');
+    expect(typing).toBeTruthy();
+    expect(typing!.classList.contains('typing-bubble--image')).toBeTrue();
+  });
+
+  it('hides the typing indicator once the whole chain is revealed', () => {
+    component.revealedStepCount.set(component.stepsIn(MOCK_CHAINS[0]));
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.typing-bubble')).toBeFalsy();
+    expect(component.pendingStep()).toBeNull();
   });
 
   // ---- Chain display ----
@@ -170,7 +361,7 @@ describe('ResultsComponent', () => {
   it('renders image after an entry when imageUrl is non-null', () => {
     component.chains.set(MOCK_CHAINS);
     component.currentChainIndex.set(0);
-    component.revealedEntryCount.set(MOCK_CHAINS[0].entries.length);
+    component.revealedStepCount.set(component.stepsIn(MOCK_CHAINS[0]));
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
@@ -181,7 +372,7 @@ describe('ResultsComponent', () => {
   it('renders placeholder entries the same as real entries (no special hidden class)', () => {
     component.chains.set(MOCK_CHAINS);
     component.currentChainIndex.set(1);
-    component.revealedEntryCount.set(MOCK_CHAINS[1].entries.length);
+    component.revealedStepCount.set(component.stepsIn(MOCK_CHAINS[1]));
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
@@ -202,12 +393,20 @@ describe('ResultsComponent', () => {
     expect(component.currentChainIndex()).toBe(1);
   });
 
-  it('resets revealedEntryCount to 0 on ShowcaseAdvancedEvent', () => {
-    component.revealedEntryCount.set(5);
+  it('plays the showcaseAdvance cue (routed through SoundService) on ShowcaseAdvancedEvent', () => {
+    const advance = spyOn(TestBed.inject(SoundService), 'showcaseAdvance');
     wsCallbacks[`/topic/game/${ROOM_CODE}`]({ chainIndex: 1 });
     fixture.detectChanges();
 
-    expect(component.revealedEntryCount()).toBe(0);
+    expect(advance).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets revealedStepCount to 0 on ShowcaseAdvancedEvent', () => {
+    component.revealedStepCount.set(5);
+    wsCallbacks[`/topic/game/${ROOM_CODE}`]({ chainIndex: 1 });
+    fixture.detectChanges();
+
+    expect(component.revealedStepCount()).toBe(0);
   });
 
   // ---- "Next" button ----
@@ -215,7 +414,7 @@ describe('ResultsComponent', () => {
   it('Next button is disabled for host when not all entries revealed', () => {
     component.chains.set(MOCK_CHAINS);
     component.isHost.set(true);
-    component.revealedEntryCount.set(0); // not all revealed
+    component.revealedStepCount.set(0); // not all revealed
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
@@ -237,7 +436,7 @@ describe('ResultsComponent', () => {
       component.chains.set(MOCK_CHAINS);
       component.isHost.set(true);
       component.currentChainIndex.set(0);
-      component.revealedEntryCount.set(MOCK_CHAINS[0].entries.length);
+      component.revealedStepCount.set(component.stepsIn(MOCK_CHAINS[0]));
       jasmine.clock().tick(600); // advance past canProceed delay
       fixture.detectChanges();
 
@@ -260,7 +459,7 @@ describe('ResultsComponent', () => {
   it('sends WS next-chain message on Next button click', () => {
     component.chains.set(MOCK_CHAINS);
     component.isHost.set(true);
-    component.revealedEntryCount.set(MOCK_CHAINS[0].entries.length);
+    component.revealedStepCount.set(component.stepsIn(MOCK_CHAINS[0]));
     fixture.detectChanges();
 
     component.onNextChain();
@@ -300,7 +499,7 @@ describe('ResultsComponent', () => {
     const lastIndex = MOCK_CHAINS.length - 1;
     component.currentChainIndex.set(lastIndex);
     // Fully revealing the last chain flips allChainsCompleted via the reveal effect.
-    component.revealedEntryCount.set(MOCK_CHAINS[lastIndex].entries.length);
+    component.revealedStepCount.set(component.stepsIn(MOCK_CHAINS[lastIndex]));
     fixture.detectChanges();
     fixture.detectChanges(); // let the effect-driven allChainsCompleted propagate
 
@@ -327,9 +526,88 @@ describe('ResultsComponent', () => {
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/lobby', ROOM_CODE]);
   });
 
+  // ---- Chain dots ----
+
+  // Fully reveal the last chain so the reveal effect flips allChainsCompleted.
+  function completeShowcase(): void {
+    const lastIndex = MOCK_CHAINS.length - 1;
+    component.currentChainIndex.set(lastIndex);
+    component.revealedStepCount.set(component.stepsIn(MOCK_CHAINS[lastIndex]));
+    fixture.detectChanges();
+    fixture.detectChanges(); // let the effect-driven allChainsCompleted propagate
+  }
+
+  it('dots are not clickable while the showcase is running', () => {
+    wsCallbacks[`/topic/game/${ROOM_CODE}`]({ chainIndex: 1 });
+    fixture.detectChanges();
+
+    component.navigateToChain(0);
+
+    expect(component.currentChainIndex()).toBe(1);
+  });
+
+  it('dots render muted during the showcase, only the current one active', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const container = compiled.querySelector('.chain-dots') as HTMLElement;
+    expect(container.classList.contains('chain-dots--showcase')).toBeTrue();
+
+    const dots = Array.from(compiled.querySelectorAll('.dot'));
+    expect(dots[0].classList.contains('active')).toBeTrue();
+    for (const dot of dots) {
+      expect(dot.classList.contains('clickable')).toBeFalse();
+    }
+  });
+
+  it('after completion a dot click navigates to that chain fully revealed', () => {
+    completeShowcase();
+
+    component.navigateToChain(0);
+
+    expect(component.currentChainIndex()).toBe(0);
+    expect(component.revealedStepCount()).toBe(component.stepsIn(MOCK_CHAINS[0]));
+    expect(component.canProceed()).toBeTrue();
+  });
+
+  it('after completion all dots are clickable and the showcase styling is gone', () => {
+    completeShowcase();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const container = compiled.querySelector('.chain-dots') as HTMLElement;
+    expect(container.classList.contains('chain-dots--showcase')).toBeFalse();
+
+    const dots = Array.from(compiled.querySelectorAll('.dot'));
+    expect(dots.length).toBe(MOCK_CHAINS.length);
+    for (const dot of dots) {
+      expect(dot.classList.contains('clickable')).toBeTrue();
+    }
+  });
+
+  // ---- Enter key ----
+
+  it('Enter triggers Back to Lobby once all chains are completed', () => {
+    completeShowcase();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(roomApiSpy.leaveResults).toHaveBeenCalledWith(ROOM_CODE, 'tok-results');
+    expect(routerSpy.navigate).toHaveBeenCalledWith(['/lobby', ROOM_CODE]);
+  });
+
+  it('Enter does nothing while the showcase is running', () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(roomApiSpy.leaveResults).not.toHaveBeenCalled();
+    expect(routerSpy.navigate).not.toHaveBeenCalled();
+  });
+
   // ---- "Export Thread" button ----
 
   it('Export (GIF) button is present in the UI', () => {
+    // The export button only renders once the whole chain is revealed.
+    const chain = component.chains()[component.currentChainIndex()];
+    component.revealedStepCount.set(component.stepsIn(chain));
+    fixture.detectChanges();
+
     const compiled = fixture.nativeElement as HTMLElement;
     const buttons = Array.from(compiled.querySelectorAll('button'));
     const exportBtn = buttons.find(b => b.textContent?.toLowerCase().includes('gif'));

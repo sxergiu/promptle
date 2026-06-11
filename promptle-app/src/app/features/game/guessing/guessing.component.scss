@@ -108,6 +108,19 @@
   transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
   display: block;
+  // Single-line feel by default, but draggable to resize like the prompt field.
+  min-height: 3rem;
+  resize: vertical;
+  line-height: 1.3;
+
+  // Custom scrollbar (matches the prompt textarea)
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+  &::-webkit-scrollbar { width: 5px; }
+  &::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
+  }
 
   &:focus {
     border-color: var(--color-primary);
@@ -117,6 +130,7 @@
 
 .guess-input[readonly] {
   cursor: default;
+  resize: none;
 }
 
 /* -- Locked-input overlay shown after submitting -- */

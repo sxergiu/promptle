@@ -10,14 +10,14 @@
         }
       </div>
       <div class="input-wrap">
-        <input
+        <textarea
           class="guess-input"
-          type="text"
           [readOnly]="submitted()"
           [value]="guessText()"
           (input)="guessText.set($any($event.target).value)"
+          (keydown.enter)="$event.preventDefault(); onSubmit()"
           placeholder="What do you see?"
-        />
+        ></textarea>
         @if (submitted()) {
           <div class="submitted-overlay">
             <span>Submitted</span>

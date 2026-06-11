@@ -1,7 +1,12 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { GeneratingComponent } from './generating.component';
 import { GENERATING_MESSAGES } from './messages';
 import { GRID_COLS, GRID_ROWS } from './pixel-grid';
+
+// The app runs zoneless (provideZonelessChangeDetection), so fakeAsync()/tick()
+// are unavailable — they need zone.js/testing. Drive timer-based behaviour with
+// real time instead.
+const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 describe('GeneratingComponent', () => {
   let component: GeneratingComponent;
@@ -37,26 +42,25 @@ describe('GeneratingComponent', () => {
     expect(compiled.querySelectorAll('.pixel-cell--body').length).toBeGreaterThan(0);
     expect(compiled.querySelectorAll('.pixel-cell--screen').length).toBeGreaterThan(0);
     expect(compiled.querySelectorAll('.pixel-cell--phone').length).toBeGreaterThan(0);
-    expect(compiled.querySelectorAll('.pixel-cell--button').length).toBe(18);
+    expect(compiled.querySelectorAll('.pixel-cell--button').length).toBe(36);
     expect(compiled.querySelectorAll('.pixel-cell--antenna').length).toBe(10);
   });
 
-  it('shows a rotating message from the message pool', fakeAsync(() => {
-    tick(600);
-    fixture.detectChanges();
+  it('shows a rotating message from the message pool', async () => {
+    // First message is set ~500ms after init.
+    await delay(700);
     expect(component.currentMessage()).toBeTruthy();
     expect(GENERATING_MESSAGES).toContain(component.currentMessage());
-  }));
+  });
 
-  it('toggles message visibility', fakeAsync(() => {
-    tick(600);
-    fixture.detectChanges();
+  it('toggles message visibility', async () => {
+    // Visible turns true at ~500ms and back to false at ~5500ms.
+    await delay(700);
     expect(component.messageVisible()).toBeTrue();
 
-    tick(5000);
-    fixture.detectChanges();
+    await delay(5200);
     expect(component.messageVisible()).toBeFalse();
-  }));
+  }, 9000);
 
   it('handles screen cell tap interaction', () => {
     const compiled = fixture.nativeElement as HTMLElement;
@@ -74,17 +78,17 @@ describe('GeneratingComponent', () => {
     expect(component.ringing()).toBeTrue();
   });
 
-  it('handles button press with visual feedback', fakeAsync(() => {
+  it('handles button press with visual feedback', async () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const buttonCell = compiled.querySelector('.pixel-cell--button') as HTMLElement;
     buttonCell.click();
     fixture.detectChanges();
     expect(component.pressedButton()).toBeGreaterThanOrEqual(0);
 
-    tick(300);
-    fixture.detectChanges();
+    // pressedButton resets ~200ms after the press.
+    await delay(300);
     expect(component.pressedButton()).toBe(-1);
-  }));
+  });
 
   it('does not render any input or textarea', () => {
     const compiled = fixture.nativeElement as HTMLElement;
