@@ -72,7 +72,10 @@ class ConcurrentSubmissionTest {
                 promptFilter,
                 eventPublisher,
                 PROMPTING_SECONDS,
-                GUESSING_SECONDS
+                GUESSING_SECONDS,
+                0.45,
+                0.45,
+                "image-to-image"
         );
     }
 
@@ -190,7 +193,6 @@ class ConcurrentSubmissionTest {
 
         when(chainEntryRepository.save(any(ChainEntry.class))).thenAnswer(inv -> inv.getArgument(0));
         when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(chainEntryRepository.findByChainOrderByRoundAsc(any())).thenReturn(List.of());
 
         // After first save: 1 of 2; after second save: 2 of 2
         AtomicInteger saveCount = new AtomicInteger(0);
@@ -227,15 +229,16 @@ class ConcurrentSubmissionTest {
         assertTrue(doneLatch.await(5, TimeUnit.SECONDS), "Both threads must finish within 5 seconds");
         executor.shutdown();
 
-        // endGuessingRound on the final round sets phase to RESULTS exactly once
+        // endGuessingRound on the final round sets phase to GENERATING (final image
+        // pass before RESULTS) exactly once
         ArgumentCaptor<Room> roomCaptor = ArgumentCaptor.forClass(Room.class);
         verify(roomRepository, atLeastOnce()).save(roomCaptor.capture());
 
-        long resultsTransitions = roomCaptor.getAllValues().stream()
-                .filter(r -> r.getPhase() == GamePhase.RESULTS)
+        long generatingTransitions = roomCaptor.getAllValues().stream()
+                .filter(r -> r.getPhase() == GamePhase.GENERATING)
                 .count();
-        assertEquals(1L, resultsTransitions,
-                "Room must transition to RESULTS exactly once, regardless of concurrent submits");
+        assertEquals(1L, generatingTransitions,
+                "Room must transition to GENERATING exactly once, regardless of concurrent submits");
     }
 
     // ---- Helpers ----
