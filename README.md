@@ -2,6 +2,10 @@
 
 > **The AI Telephone** — a real-time multiplayer party game where prompts become images, images become guesses, and guesses become chaos.
 
+<p align="center">
+  <img src="assets/demo.gif" alt="Promptle demo — pick an avatar, fill a 7-player lobby, write a prompt, watch the AI generate an image, guess the prompt, then see the chain revealed" width="760">
+</p>
+
 ---
 
 ## How It Works
