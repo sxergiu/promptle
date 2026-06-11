@@ -7,8 +7,9 @@ set -uo pipefail
 #
 # Usage:
 #   ./scripts/dev.sh            # open the interactive menu
+#   ./scripts/dev.sh play       # one command: Postgres + stub images + backend + frontend
 #   ./scripts/dev.sh backend    # jump straight to a task
-#                               # (backend|frontend|both|test|test-backend|test-frontend|test-all|sim|deploy|export|gen-assets|preview-gif|clear-db|status)
+#                               # (play|backend|frontend|both|test|test-backend|test-frontend|test-all|sim|deploy|export|gen-assets|preview-gif|clear-db|status)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -89,6 +90,43 @@ check_postgres() {
     return 1
 }
 
+# Bring Postgres up for host-run dev (the one-command 'play' path) and wait for it.
+# Uses a standalone `docker run` that publishes :5432 to the host — NOT the
+# docker-compose 'postgres' service, which is deliberately not exposed to the host
+# (there the backend runs inside the same Docker network). No volume = no persistence,
+# which matches the game's ephemeral state.
+PG_CONTAINER="promptle-dev-postgres"
+ensure_postgres() {
+    if port_open "$PG_HOST" "$PG_PORT"; then
+        info "Postgres already up on :$PG_PORT."
+        return 0
+    fi
+    if ! command -v docker >/dev/null 2>&1; then
+        error "Postgres isn't running and Docker isn't installed."
+        error "Either install Docker, or start a Postgres on :$PG_PORT ($PG_USER/$PG_PASS, db '$PG_DB') yourself and re-run."
+        return 1
+    fi
+    # Reuse the dev container across runs; create it the first time.
+    if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$PG_CONTAINER"; then
+        info "Starting existing Postgres container '$PG_CONTAINER'..."
+        docker start "$PG_CONTAINER" >/dev/null || { error "Failed to start container '$PG_CONTAINER'."; return 1; }
+    else
+        info "Creating Postgres container '$PG_CONTAINER' (docker run, :$PG_PORT published)..."
+        docker run -d --name "$PG_CONTAINER" \
+            -e POSTGRES_USER="$PG_USER" -e POSTGRES_PASSWORD="$PG_PASS" -e POSTGRES_DB="$PG_DB" \
+            -p "$PG_PORT:5432" postgres:16-alpine >/dev/null \
+            || { error "Failed to start Postgres via docker run."; return 1; }
+    fi
+    # Wait up to ~30s for the port to accept connections.
+    local i
+    for i in $(seq 1 30); do
+        port_open "$PG_HOST" "$PG_PORT" && { info "Postgres is up on :$PG_PORT."; return 0; }
+        sleep 1
+    done
+    error "Postgres didn't come up on :$PG_PORT in time. Check: docker logs $PG_CONTAINER"
+    return 1
+}
+
 # --- Tasks ------------------------------------------------------------------
 run_backend() {
     check_postgres || { read -rp "Start backend anyway? [y/N] " a; [[ "$a" =~ ^[Yy]$ ]] || return; }
@@ -109,6 +147,8 @@ run_frontend() {
 }
 
 run_both() {
+    # Optional $1: extra args handed to the backend's spring-boot:run (e.g. property overrides).
+    local be_extra_args="${1:-}"
     check_postgres || { read -rp "Start anyway? [y/N] " a; [[ "$a" =~ ^[Yy]$ ]] || return; }
     local be_log="$REPO_DIR/.backend.log"
     local fe_log="$REPO_DIR/.frontend.log"
@@ -119,7 +159,7 @@ run_both() {
     backend_java_env
     echo ""
 
-    ( cd "$BACKEND_DIR" && JAVA_HOME="${BACKEND_JAVA_HOME:-$JAVA_HOME}" ./mvnw spring-boot:run ) > "$be_log" 2>&1 &
+    ( cd "$BACKEND_DIR" && JAVA_HOME="${BACKEND_JAVA_HOME:-$JAVA_HOME}" ./mvnw spring-boot:run ${be_extra_args:+$be_extra_args} ) > "$be_log" 2>&1 &
     local be_pid=$!
     ( cd "$FRONTEND_DIR" && npm run PromptleUI ) > "$fe_log" 2>&1 &
     local fe_pid=$!
@@ -146,6 +186,17 @@ run_both() {
     wait "$be_pid" "$fe_pid" 2>/dev/null
     trap - INT
     kill "$be_tail" "$fe_tail" 2>/dev/null
+}
+
+# One-command local play: Postgres (docker) + stub images + backend + frontend.
+# Forces the stub image provider at runtime so no AI backend (ComfyUI) is needed
+# and application.properties is left untouched.
+run_play() {
+    info "Promptle — one-command local play (stub images, no AI backend needed)."
+    ensure_postgres || { read -rp "Start the app anyway? [y/N] " a; [[ "$a" =~ ^[Yy]$ ]] || return; }
+    info "Using stub images (override: image.generation.provider=stub)."
+    info "Once both are up, open http://localhost:$FRONTEND_PORT and create a room."
+    run_both '-Dspring-boot.run.arguments=--image.generation.provider=stub'
 }
 
 run_sim() {
@@ -345,6 +396,7 @@ menu() {
         echo ""
         echo -e "  ${BOLD}Promptle Dev Console${NC}"
         echo "  ────────────────────"
+        echo "  p) Play locally (Postgres + stub images + app)"
         echo "  1) Run backend"
         echo "  2) Run frontend"
         echo "  3) Run both (backend+frontend)"
@@ -358,6 +410,7 @@ menu() {
         echo ""
         read -rp "  > " choice
         case "$choice" in
+            p|P) run_play ;;
             1) run_backend ;;
             2) run_frontend ;;
             3) run_both ;;
@@ -376,6 +429,7 @@ menu() {
 
 # --- Entry ------------------------------------------------------------------
 case "${1:-menu}" in
+    play)           run_play ;;
     backend)        run_backend ;;
     frontend)       run_frontend ;;
     both)           run_both ;;
@@ -392,7 +446,7 @@ case "${1:-menu}" in
     status)         show_status ;;
     menu)           menu ;;
     -h|--help)
-        echo "Usage: ./scripts/dev.sh [backend|frontend|both|test|test-backend|test-frontend|test-all|sim|deploy|export|gen-assets|preview-gif|clear-db|status]"
+        echo "Usage: ./scripts/dev.sh [play|backend|frontend|both|test|test-backend|test-frontend|test-all|sim|deploy|export|gen-assets|preview-gif|clear-db|status]"
         echo "  (no args)  open the interactive menu"
         ;;
     *) error "Unknown task: $1"; echo "Try: ./scripts/dev.sh --help" ;;
