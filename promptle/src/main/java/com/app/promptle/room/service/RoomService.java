@@ -146,8 +146,7 @@ public class RoomService {
         player.setJoinedAt(Instant.now());
         player = playerRepository.save(player);
 
-        List<Player> connectedPlayers = playerRepository.findByRoomAndConnectedTrue(room);
-        publishRoomEvent(roomCode, RoomEventType.PLAYER_JOINED, connectedPlayers, room.getHostId());
+        publishRoomEvent(roomCode, RoomEventType.PLAYER_JOINED, lobbyRoster(room), room.getHostId());
 
         return new JoinRoomResponse(player.getToken().toString(), roomCode, player.getId().toString());
     }
@@ -190,12 +189,17 @@ public class RoomService {
 
         List<Player> snapshotPlayers;
         if (phase == GamePhase.LOBBY) {
-            // In LOBBY, only show connected players — disconnected players are ghosts who left.
-            // Always include the requesting player even if WS handshake hasn't completed yet.
-            List<Player> connectedInLobby = playerRepository.findByRoomAndConnectedTrue(room);
-            snapshotPlayers = connectedInLobby.stream().anyMatch(p -> p.getId().equals(player.getId()))
-                    ? connectedInLobby
-                    : Stream.concat(connectedInLobby.stream(), Stream.of(player)).toList();
+            // In LOBBY, show connected players plus the current host (lobbyRoster keeps the
+            // host visible across a brief WS drop). Always include the requesting player too,
+            // even if their own WS handshake hasn't completed yet.
+            List<Player> roster = lobbyRoster(room);
+            snapshotPlayers = roster.stream().anyMatch(p -> p.getId().equals(player.getId()))
+                    ? roster
+                    : Stream.concat(roster.stream(), Stream.of(player)).toList();
+        } else if (phase == GamePhase.RESULTS) {
+            // Full game roster — players whose WS briefly drops while navigating back to
+            // the lobby must not vanish from the roster of whoever returned first.
+            snapshotPlayers = playerRepository.findByRoom(room);
         } else {
             List<Player> connectedPlayers = playerRepository.findByRoomAndConnectedTrue(room);
             // Always include the requesting player even if not yet connected (WS handshake hasn't fired yet)
@@ -203,7 +207,8 @@ public class RoomService {
                     ? connectedPlayers
                     : Stream.concat(connectedPlayers.stream(), Stream.of(player)).toList();
         }
-        GameStateSnapshot base = roomMapper.toSnapshot(room, snapshotPlayers, timerSeconds, serverTimestamp, imageUrl);
+        GameStateSnapshot base = roomMapper.toSnapshot(room, snapshotPlayers, timerSeconds, serverTimestamp, imageUrl,
+                returnedIds(roomCode));
 
         boolean hasSubmitted = computeHasSubmitted(player, room);
         int submittedCount = computeSubmittedCount(room);
@@ -231,7 +236,10 @@ public class RoomService {
 
         Room room = player.getRoom();
         List<Player> connectedPlayers = playerRepository.findByRoomAndConnectedTrue(room);
-        publishRoomEvent(roomCode, RoomEventType.PLAYER_JOINED, connectedPlayers, room.getHostId());
+        // During RESULTS the lobby shows the frozen full roster with return status —
+        // a connected-only list would make briefly-dropped returnees vanish from it.
+        // In LOBBY, lobbyRoster keeps the host pinned even across a brief WS drop.
+        publishRoomEvent(roomCode, RoomEventType.PLAYER_JOINED, rosterFor(room, connectedPlayers), room.getHostId());
 
         if (room.getPhase() == GamePhase.RESULTS) {
             GameResultsEvent resultsEvent = buildGameResultsEvent(room, connectedPlayers);
@@ -252,7 +260,11 @@ public class RoomService {
 
         Room room = player.getRoom();
         List<Player> connectedPlayers = playerRepository.findByRoomAndConnectedTrue(room);
-        publishRoomEvent(roomCode, RoomEventType.PLAYER_LEFT, connectedPlayers, room.getHostId());
+        // Same full-roster rule as playerConnected: don't shrink the RESULTS-wait
+        // roster in already-returned players' lobbies on a transient WS drop. In LOBBY,
+        // lobbyRoster keeps the current host pinned (the hand-off below re-broadcasts
+        // with the new host if the leaver was the host).
+        publishRoomEvent(roomCode, RoomEventType.PLAYER_LEFT, rosterFor(room, connectedPlayers), room.getHostId());
 
         // Auto-reset when last player disconnects during a non-LOBBY phase
         // so new players can always join a room without the host having to manually reset
@@ -316,22 +328,71 @@ public class RoomService {
         }
 
         resultsReturned.computeIfAbsent(roomCode, k -> ConcurrentHashMap.newKeySet()).add(player.getId());
-        resetIfAllReturned(room);
+        if (!resetIfAllReturned(room)) {
+            // Broadcast the FULL roster (not just connected players) so already-returned
+            // players see the newcomer flip to "returned" even if someone's WS briefly
+            // dropped during navigation. The all-returned case is superseded by GAME_RESET.
+            publishRoomEvent(roomCode, RoomEventType.PLAYER_RETURNED,
+                    playerRepository.findByRoom(room), room.getHostId());
+        }
     }
 
     // ---- Private helpers ----
 
-    /** Resets the room to a fresh lobby once every connected player has returned from RESULTS. */
-    private void resetIfAllReturned(Room room) {
-        Set<UUID> returned = resultsReturned.getOrDefault(room.getRoomCode(), Set.of());
+    /**
+     * Picks the roster to broadcast for a phase given the already-fetched connected list:
+     * the frozen full roster during RESULTS, the {@link #lobbyRoster(Room)} during LOBBY,
+     * and the connected players otherwise.
+     */
+    private List<Player> rosterFor(Room room, List<Player> connectedPlayers) {
+        return switch (room.getPhase()) {
+            case RESULTS -> playerRepository.findByRoom(room);
+            case LOBBY -> lobbyRoster(room);
+            default -> connectedPlayers;
+        };
+    }
+
+    /**
+     * The LOBBY roster: connected players plus the <em>current</em> host even if their
+     * socket is momentarily down. A mobile host backgrounding the tab to share the invite
+     * must never disappear for players who join during that window, and a freshly created
+     * host (connected=false until their WS handshake lands) must be visible immediately.
+     * Only the current host is force-included, so a host who has truly left — and been
+     * handed off to someone else — drops out naturally.
+     */
+    private List<Player> lobbyRoster(Room room) {
+        List<Player> connected = playerRepository.findByRoomAndConnectedTrue(room);
+        UUID hostId = room.getHostId();
+        if (hostId == null || connected.stream().anyMatch(p -> p.getId().equals(hostId))) {
+            return connected;
+        }
+        return playerRepository.findById(hostId)
+                .map(host -> Stream.concat(connected.stream(), Stream.of(host))
+                        .sorted(Comparator.comparing(Player::getJoinedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                        .toList())
+                .orElse(connected);
+    }
+
+    /**
+     * Resets the room to a fresh lobby once every connected player has returned from
+     * RESULTS. Returns whether the reset happened.
+     */
+    private boolean resetIfAllReturned(Room room) {
+        Set<UUID> returned = returnedIds(room.getRoomCode());
         List<Player> connected = playerRepository.findByRoomAndConnectedTrue(room);
         if (connected.isEmpty()) {
-            return; // the all-disconnected case is handled by performReset on disconnect
+            return false; // the all-disconnected case is handled by performReset on disconnect
         }
         boolean allReturned = connected.stream().allMatch(p -> returned.contains(p.getId()));
         if (allReturned) {
             performReset(room, true);
+            return true;
         }
+        return false;
+    }
+
+    private Set<UUID> returnedIds(String roomCode) {
+        return resultsReturned.getOrDefault(roomCode, Set.of());
     }
 
     /**
@@ -393,8 +454,9 @@ public class RoomService {
     }
 
     private void publishRoomEvent(String roomCode, RoomEventType type, List<Player> players, UUID hostId) {
+        Set<UUID> returned = returnedIds(roomCode);
         List<PlayerDto> playerDtos = players.stream()
-                .map(roomMapper::toDto)
+                .map(p -> roomMapper.toDto(p, returned))
                 .toList();
         String hostIdStr = hostId != null ? hostId.toString() : null;
         RoomEvent roomEvent = new RoomEvent(type, playerDtos, hostIdStr);
