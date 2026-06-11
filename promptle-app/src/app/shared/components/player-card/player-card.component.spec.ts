@@ -93,6 +93,54 @@ describe('PlayerCardComponent', () => {
     expect(kickBtn).toBeFalsy();
   });
 
+  // ---- ME badge ----
+
+  it('shows the ME badge when isCurrentPlayer is true', () => {
+    fixture.componentRef.setInput('isCurrentPlayer', true);
+    fixture.detectChanges();
+
+    const badge = (fixture.nativeElement as HTMLElement).querySelector('.me-badge');
+    expect(badge).toBeTruthy();
+    expect(badge!.textContent?.trim()).toBe('ME');
+  });
+
+  it('hides the ME badge when isCurrentPlayer is false', () => {
+    fixture.componentRef.setInput('isCurrentPlayer', false);
+    fixture.detectChanges();
+
+    const badge = (fixture.nativeElement as HTMLElement).querySelector('.me-badge');
+    expect(badge).toBeFalsy();
+  });
+
+  // ---- Returned / away host classes ----
+
+  it('applies is-returned host class when returned is true', () => {
+    fixture.componentRef.setInput('returned', true);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.classList.contains('is-returned')).toBeTrue();
+    expect(host.classList.contains('is-away')).toBeFalse();
+  });
+
+  it('applies is-away host class when returned is false', () => {
+    fixture.componentRef.setInput('returned', false);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.classList.contains('is-away')).toBeTrue();
+    expect(host.classList.contains('is-returned')).toBeFalse();
+  });
+
+  it('applies neither is-returned nor is-away when returned is null', () => {
+    fixture.componentRef.setInput('returned', null);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.classList.contains('is-returned')).toBeFalse();
+    expect(host.classList.contains('is-away')).toBeFalse();
+  });
+
   it('kick button does nothing on click — no output emitted', () => {
     fixture.componentRef.setInput('showKickButton', true);
     fixture.detectChanges();

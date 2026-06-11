@@ -59,6 +59,22 @@ public class LocalImageStorageService implements ImageStorageService {
     }
 
     @Override
+    public byte[] fetchImageBytes(String imageUrl) {
+        String[] parts = imageUrl.split("/");
+        if (parts.length < 5) {
+            throw new IllegalArgumentException("Malformed image URL: " + imageUrl);
+        }
+        String gameId = parts[3];
+        String imageId = parts[4];
+        Path file = Paths.get(basePath, gameId, imageId + ".png");
+        try {
+            return Files.readAllBytes(file);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
     public void deleteGame(String gameId) {
         Path dir = Paths.get(basePath, gameId);
         if (!Files.exists(dir)) {

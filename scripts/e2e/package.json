@@ -1,0 +1,14 @@
+{
+  "name": "promptle-sim-2player",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Drives a full 2-player Promptle game through the UI and screenshots each screen.",
+  "scripts": {
+    "sim": "node simulate.mjs",
+    "setup": "npm install && npx playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

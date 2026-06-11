@@ -6,6 +6,8 @@ import com.app.promptle.game.event.*;
 import com.app.promptle.game.model.*;
 import com.app.promptle.game.repository.*;
 import com.app.promptle.image.api.ImageGenerationService;
+import com.app.promptle.image.api.ImageStorageService;
+import com.app.promptle.image.filter.PromptFilter;
 import com.app.promptle.room.event.RoomApplicationEvent;
 import com.app.promptle.room.model.Player;
 import com.app.promptle.room.model.Room;
@@ -39,9 +41,12 @@ class GameServiceTest {
     @Mock private PlayerRepository playerRepository;
     @Mock private ChainRepository chainRepository;
     @Mock private ChainEntryRepository chainEntryRepository;
+    @Mock private ArtStyleRepository artStyleRepository;
     @Mock private RoundAssignmentService roundAssignmentService;
     @Mock private TimerService timerService;
     @Mock private ImageGenerationService imageGenerationService;
+    @Mock private ImageStorageService imageStorageService;
+    @Mock private PromptFilter promptFilter;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     private GameService gameService;
@@ -52,17 +57,25 @@ class GameServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(promptFilter.sanitize(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(artStyleRepository.findAll()).thenReturn(buildArtStyles(12));
         gameService = new GameService(
                 roomRepository,
                 playerRepository,
                 chainRepository,
                 chainEntryRepository,
+                artStyleRepository,
                 roundAssignmentService,
                 timerService,
                 imageGenerationService,
+                imageStorageService,
+                promptFilter,
                 eventPublisher,
                 PROMPTING_SECONDS,
-                GUESSING_SECONDS
+                GUESSING_SECONDS,
+                0.45,
+                0.45,
+                "image-to-image"
         );
     }
 
@@ -81,15 +94,42 @@ class GameServiceTest {
     }
 
     @Test
-    void startGame_ThrowsGameException_WhenFewerThan2Players() {
+    void startGame_ThrowsGameException_WhenZeroPlayers() {
         UUID hostId = UUID.randomUUID();
         Room room = buildRoom("ABCD1234", GamePhase.LOBBY);
         room.setHostId(hostId);
 
         when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
-        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(buildPlayer(hostId, room)));
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of());
 
         assertThrows(GameException.class, () -> gameService.startGame("ABCD1234", hostId));
+    }
+
+    @Test
+    void startGame_SinglePlayer_DoesNotGenerateRoundAssignments() {
+        UUID hostId = UUID.randomUUID();
+        Room room = buildRoom("ABCD1234", GamePhase.LOBBY);
+        room.setHostId(hostId);
+
+        Player solo = buildPlayer(hostId, room);
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(solo));
+        when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(chainRepository.save(any(Chain.class))).thenAnswer(inv -> {
+            Chain c = inv.getArgument(0);
+            c.setId(UUID.randomUUID());
+            return c;
+        });
+
+        gameService.startGame("ABCD1234", hostId);
+
+        // A solo game has a single chain and skips guessing entirely, so the cyclic
+        // Latin-square assignment (which requires N >= 2) must not be invoked.
+        verify(roundAssignmentService, never()).generateAssignments(any(), anyList(), anyList());
+        verify(chainRepository, times(1)).save(any(Chain.class));
+        assertEquals(GamePhase.PROMPTING, room.getPhase());
+        assertEquals(1, room.getTotalRounds());
     }
 
     @Test
@@ -728,7 +768,7 @@ class GameServiceTest {
     }
 
     @Test
-    void endGuessingRound_FinalRound_SetsPhaseToResults() {
+    void endGuessingRound_FinalRound_SetsPhaseToGenerating() {
         int n = 2;
         Room room = buildRoom("ABCD1234", GamePhase.GUESSING);
         room.setCurrentRound(n);
@@ -746,15 +786,27 @@ class GameServiceTest {
         when(chainEntryRepository.save(any(ChainEntry.class))).thenAnswer(inv -> inv.getArgument(0));
         when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
         when(chainRepository.findByRoom(room)).thenReturn(List.of(chain1, chain2));
-        when(chainEntryRepository.findByChainOrderByRoundAsc(any())).thenReturn(List.of());
 
         gameService.onRoundTimerExpired("ABCD1234", n);
 
-        assertEquals(GamePhase.RESULTS, room.getPhase());
+        // The final guessing round is followed by one more GENERATING pass so every
+        // chain ends on an image — RESULTS only comes after onAllImagesReady.
+        assertEquals(GamePhase.GENERATING, room.getPhase());
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher, atLeastOnce()).publishEvent(captor.capture());
+        assertTrue(captor.getAllValues().stream()
+                        .anyMatch(e -> e instanceof PhaseChangedApplicationEvent p
+                                && p.phase() == GamePhase.GENERATING),
+                "Expected a GENERATING PhaseChangedApplicationEvent");
+        assertTrue(captor.getAllValues().stream()
+                        .anyMatch(e -> e instanceof StartImageGenerationEvent),
+                "Expected a StartImageGenerationEvent for the final pass");
+        verify(timerService).startGeneratingTimeout("ABCD1234", n);
     }
 
     @Test
-    void endGuessingRound_FinalRound_PublishesGameResultsApplicationEvent() {
+    void endGuessingRound_FinalRound_DoesNotPublishGameResultsYet() {
         int n = 2;
         Room room = buildRoom("ABCD1234", GamePhase.GUESSING);
         room.setCurrentRound(n);
@@ -772,21 +824,21 @@ class GameServiceTest {
         when(chainEntryRepository.save(any(ChainEntry.class))).thenAnswer(inv -> inv.getArgument(0));
         when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
         when(chainRepository.findByRoom(room)).thenReturn(List.of(chain1, chain2));
-        when(chainEntryRepository.findByChainOrderByRoundAsc(any())).thenReturn(List.of());
 
         gameService.onRoundTimerExpired("ABCD1234", n);
 
+        // GameResults is only published by onAllImagesReady after the final GENERATING pass.
         ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
         verify(eventPublisher, atLeastOnce()).publishEvent(captor.capture());
         boolean hasResults = captor.getAllValues().stream()
                 .anyMatch(e -> e instanceof GameResultsApplicationEvent);
-        assertTrue(hasResults, "Expected GameResultsApplicationEvent to be published");
+        assertFalse(hasResults, "GameResultsApplicationEvent must not be published before the final image pass");
     }
 
     @Test
-    void endGuessingRound_FinalRound_PlaceholderEntriesHaveNullPlayerIdAndIsPlaceholderTrue() {
+    void onAllImagesReady_FinalRound_PlaceholderEntriesHaveNullPlayerIdAndIsPlaceholderTrue() {
         int n = 2;
-        Room room = buildRoom("ABCD1234", GamePhase.GUESSING);
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
         room.setCurrentRound(n);
         room.setTotalRounds(n);
         Player player1 = buildPlayer(UUID.randomUUID(), room);
@@ -803,17 +855,12 @@ class GameServiceTest {
         placeholder.setChain(chain1);
 
         when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
-        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(List.of(player1, player2));
-        when(roundAssignmentService.getAssignedChain(room, player1, n)).thenReturn(chain2);
-        when(roundAssignmentService.getAssignedChain(room, player2, n)).thenReturn(chain1);
-        when(chainEntryRepository.findByChainAndRound(any(), eq(n))).thenReturn(Optional.empty());
-        when(chainEntryRepository.save(any(ChainEntry.class))).thenAnswer(inv -> inv.getArgument(0));
         when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
         when(chainRepository.findByRoom(room)).thenReturn(List.of(chain1, chain2));
         when(chainEntryRepository.findByChainOrderByRoundAsc(chain1)).thenReturn(List.of(placeholder));
         when(chainEntryRepository.findByChainOrderByRoundAsc(chain2)).thenReturn(List.of());
 
-        gameService.onRoundTimerExpired("ABCD1234", n);
+        gameService.onAllImagesReady("ABCD1234");
 
         ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
         verify(eventPublisher, atLeastOnce()).publishEvent(captor.capture());
@@ -829,6 +876,78 @@ class GameServiceTest {
     }
 
     // ---- onAllImagesReady ----
+
+    @Test
+    void onAllImagesReady_FinalRound_TransitionsToResults_AndPublishesGameResults() {
+        int n = 2;
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(n);
+        room.setTotalRounds(n);
+        Player player1 = buildPlayer(UUID.randomUUID(), room);
+        Chain chain1 = buildChain(player1, room);
+        Player player2 = buildPlayer(UUID.randomUUID(), room);
+        Chain chain2 = buildChain(player2, room);
+
+        ChainEntry finalEntry = new ChainEntry();
+        finalEntry.setAuthor(player2);
+        finalEntry.setText("final guess");
+        finalEntry.setImageUrl("/api/images/game/final.png");
+        finalEntry.setRound(n);
+        finalEntry.setChain(chain1);
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(chain1, chain2));
+        when(chainEntryRepository.findByChainOrderByRoundAsc(chain1)).thenReturn(List.of(finalEntry));
+        when(chainEntryRepository.findByChainOrderByRoundAsc(chain2)).thenReturn(List.of());
+
+        gameService.onAllImagesReady("ABCD1234");
+
+        assertEquals(GamePhase.RESULTS, room.getPhase());
+        assertEquals(n, room.getCurrentRound());
+        verify(timerService).cancelGeneratingTimeout("ABCD1234");
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher, atLeastOnce()).publishEvent(captor.capture());
+        assertTrue(captor.getAllValues().stream()
+                        .anyMatch(e -> e instanceof PhaseChangedApplicationEvent p
+                                && p.phase() == GamePhase.RESULTS),
+                "Expected a RESULTS PhaseChangedApplicationEvent");
+        Optional<GameResultsApplicationEvent> results = captor.getAllValues().stream()
+                .filter(e -> e instanceof GameResultsApplicationEvent)
+                .map(e -> (GameResultsApplicationEvent) e)
+                .findFirst();
+        assertTrue(results.isPresent(), "Expected a GameResultsApplicationEvent");
+        assertEquals("/api/images/game/final.png",
+                results.get().payload().chains().get(0).entries().get(0).imageUrl());
+        assertFalse(captor.getAllValues().stream()
+                        .anyMatch(e -> e instanceof RoundReadyApplicationEvent),
+                "No RoundReadyApplicationEvent on the final pass — there is no next guessing round");
+        verify(timerService, never()).startRoundTimer(eq("ABCD1234"), anyInt(), anyLong());
+    }
+
+    @Test
+    void onAllImagesReady_SoloGame_TransitionsToResults() {
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(1);
+        room.setTotalRounds(1);
+        Player solo = buildPlayer(UUID.randomUUID(), room);
+        Chain chain = buildChain(solo, room);
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
+        when(chainEntryRepository.findByChainOrderByRoundAsc(chain)).thenReturn(List.of());
+
+        gameService.onAllImagesReady("ABCD1234");
+
+        assertEquals(GamePhase.RESULTS, room.getPhase());
+        assertEquals(1, room.getCurrentRound());
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher, atLeastOnce()).publishEvent(captor.capture());
+        assertTrue(captor.getAllValues().stream()
+                .anyMatch(e -> e instanceof GameResultsApplicationEvent));
+    }
 
     @Test
     void onAllImagesReady_IncrementsRoundAndSetsPhaseToGuessing() {
@@ -1121,6 +1240,223 @@ class GameServiceTest {
         assertEquals(GamePhase.PROMPTING, room.getPhase());
     }
 
+    // ---- startGame — chain style assignment ----
+
+    @Test
+    void startGame_AssignsUniqueStyleToEachChain() {
+        int n = 3;
+        UUID hostId = UUID.randomUUID();
+        Room room = buildRoom("ABCD1234", GamePhase.LOBBY);
+        room.setHostId(hostId);
+
+        List<Player> players = buildPlayers(n, room);
+        players.get(0).setId(hostId);
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(players);
+        when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ArgumentCaptor<Chain> chainCaptor = ArgumentCaptor.forClass(Chain.class);
+        when(chainRepository.save(chainCaptor.capture())).thenAnswer(inv -> {
+            Chain c = inv.getArgument(0);
+            c.setId(UUID.randomUUID());
+            return c;
+        });
+
+        gameService.startGame("ABCD1234", hostId);
+
+        List<Chain> saved = chainCaptor.getAllValues();
+        assertEquals(n, saved.size());
+        List<String> styles = saved.stream().map(Chain::getStyle).toList();
+        assertTrue(styles.stream().allMatch(Objects::nonNull), "Every chain must have a non-null style");
+        assertEquals(n, new HashSet<>(styles).size(), "All chain styles must be unique");
+    }
+
+    @Test
+    void startGame_ThrowsGameException_WhenNotEnoughStyles() {
+        int n = 3;
+        UUID hostId = UUID.randomUUID();
+        Room room = buildRoom("ABCD1234", GamePhase.LOBBY);
+        room.setHostId(hostId);
+
+        List<Player> players = buildPlayers(n, room);
+        players.get(0).setId(hostId);
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(playerRepository.findByRoomAndConnectedTrue(room)).thenReturn(players);
+        when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(artStyleRepository.findAll()).thenReturn(buildArtStyles(2)); // only 2 for 3 players
+
+        assertThrows(GameException.class, () -> gameService.startGame("ABCD1234", hostId));
+    }
+
+    // ---- triggerImageGeneration — prompt decoration ----
+
+    @Test
+    void onStartImageGeneration_DecoratesPromptWithChainStyle() {
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(1);
+        Player p = buildPlayer(UUID.randomUUID(), room);
+        Chain chain = buildChain(p, room);
+        chain.setStyle("pixel art");
+
+        ChainEntry entry = new ChainEntry();
+        entry.setText("a dragon");
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
+        when(chainEntryRepository.findByChainAndRound(chain, 1)).thenReturn(Optional.of(entry));
+        when(chainEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(imageGenerationService.generateImage(anyString()))
+                .thenReturn(CompletableFuture.completedFuture("/img/url"));
+
+        gameService.onStartImageGeneration(new StartImageGenerationEvent("ABCD1234"));
+
+        verify(imageGenerationService).generateImage("a dragon, (pixel art style:0.45)");
+    }
+
+    @Test
+    void onStartImageGeneration_UsesPlainPrompt_WhenChainStyleIsNull() {
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(1);
+        Player p = buildPlayer(UUID.randomUUID(), room);
+        Chain chain = buildChain(p, room); // style is null by default
+
+        ChainEntry entry = new ChainEntry();
+        entry.setText("a dragon");
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
+        when(chainEntryRepository.findByChainAndRound(chain, 1)).thenReturn(Optional.of(entry));
+        when(chainEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(imageGenerationService.generateImage(anyString()))
+                .thenReturn(CompletableFuture.completedFuture("/img/url"));
+
+        gameService.onStartImageGeneration(new StartImageGenerationEvent("ABCD1234"));
+
+        verify(imageGenerationService).generateImage("a dragon");
+    }
+
+    // ---- triggerImageGeneration — img2img ----
+
+    @Test
+    void triggerImageGeneration_UsesTxt2img_ForRound1() {
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(1);
+        Player p = buildPlayer(UUID.randomUUID(), room);
+        Chain chain = buildChain(p, room);
+
+        ChainEntry entry = new ChainEntry();
+        entry.setText("a sunset");
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
+        when(chainEntryRepository.findByChainAndRound(chain, 1)).thenReturn(Optional.of(entry));
+        when(chainEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(imageGenerationService.generateImage(anyString()))
+                .thenReturn(CompletableFuture.completedFuture("/img/url"));
+
+        gameService.onStartImageGeneration(new StartImageGenerationEvent("ABCD1234"));
+
+        verify(imageGenerationService).generateImage(anyString());
+        verify(imageGenerationService, never()).generateImageFromImage(anyString(), any(byte[].class));
+    }
+
+    @Test
+    void triggerImageGeneration_UsesImg2img_ForRound2_WhenPreviousImageExists() {
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(2);
+        Player p = buildPlayer(UUID.randomUUID(), room);
+        Chain chain = buildChain(p, room);
+
+        // Current round entry (round 2)
+        ChainEntry currentEntry = new ChainEntry();
+        currentEntry.setText("a cat on a mountain");
+
+        // Previous round entry (round 1) with an image
+        ChainEntry prevEntry = new ChainEntry();
+        prevEntry.setImageUrl("/api/images/game-abc/prev-img");
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
+        when(chainEntryRepository.findByChainAndRound(chain, 2)).thenReturn(Optional.of(currentEntry));
+        when(chainEntryRepository.findByChainAndRound(chain, 1)).thenReturn(Optional.of(prevEntry));
+        when(chainEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(imageStorageService.fetchImageBytes("/api/images/game-abc/prev-img"))
+                .thenReturn(new byte[]{1, 2, 3});
+        when(imageGenerationService.generateImageFromImage(anyString(), any(byte[].class)))
+                .thenReturn(CompletableFuture.completedFuture("/img/img2img-url"));
+
+        gameService.onStartImageGeneration(new StartImageGenerationEvent("ABCD1234"));
+
+        verify(imageGenerationService).generateImageFromImage(anyString(), any(byte[].class));
+        verify(imageStorageService).fetchImageBytes("/api/images/game-abc/prev-img");
+    }
+
+    @Test
+    void triggerImageGeneration_UsesTxt2img_ForRound2_WhenChainModeIsTextToImage() {
+        GameService t2iGameService = new GameService(
+                roomRepository, playerRepository, chainRepository, chainEntryRepository,
+                artStyleRepository, roundAssignmentService, timerService,
+                imageGenerationService, imageStorageService, promptFilter, eventPublisher,
+                PROMPTING_SECONDS, GUESSING_SECONDS, 0.45, 0.45, "text-to-image");
+
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(2);
+        Player p = buildPlayer(UUID.randomUUID(), room);
+        Chain chain = buildChain(p, room);
+
+        ChainEntry currentEntry = new ChainEntry();
+        currentEntry.setText("a cat on a mountain");
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
+        when(chainEntryRepository.findByChainAndRound(chain, 2)).thenReturn(Optional.of(currentEntry));
+        when(chainEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(imageGenerationService.generateImage(anyString()))
+                .thenReturn(CompletableFuture.completedFuture("/img/txt2img-url"));
+
+        t2iGameService.onStartImageGeneration(new StartImageGenerationEvent("ABCD1234"));
+
+        // In text-to-image mode round 2 is generated fresh from the guess — no previous
+        // image is fetched and img2img is never invoked, even though a prior round exists.
+        verify(imageGenerationService).generateImage(anyString());
+        verify(imageGenerationService, never()).generateImageFromImage(anyString(), any(byte[].class));
+        verify(imageStorageService, never()).fetchImageBytes(anyString());
+    }
+
+    @Test
+    void triggerImageGeneration_FallsBackToTxt2img_WhenPreviousImageFetchFails() {
+        Room room = buildRoom("ABCD1234", GamePhase.GENERATING);
+        room.setCurrentRound(2);
+        Player p = buildPlayer(UUID.randomUUID(), room);
+        Chain chain = buildChain(p, room);
+
+        // Current round entry (round 2)
+        ChainEntry currentEntry = new ChainEntry();
+        currentEntry.setText("a dog in space");
+
+        // Previous round entry (round 1) with an image URL
+        ChainEntry prevEntry = new ChainEntry();
+        prevEntry.setImageUrl("/api/images/game-abc/prev-img");
+
+        when(roomRepository.findByRoomCode("ABCD1234")).thenReturn(Optional.of(room));
+        when(chainRepository.findByRoom(room)).thenReturn(List.of(chain));
+        when(chainEntryRepository.findByChainAndRound(chain, 2)).thenReturn(Optional.of(currentEntry));
+        when(chainEntryRepository.findByChainAndRound(chain, 1)).thenReturn(Optional.of(prevEntry));
+        when(chainEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(imageStorageService.fetchImageBytes("/api/images/game-abc/prev-img"))
+                .thenThrow(new RuntimeException("File not found"));
+        when(imageGenerationService.generateImage(anyString()))
+                .thenReturn(CompletableFuture.completedFuture("/img/fallback-url"));
+
+        gameService.onStartImageGeneration(new StartImageGenerationEvent("ABCD1234"));
+
+        // Should fall back to txt2img
+        verify(imageGenerationService).generateImage(anyString());
+        verify(imageGenerationService, never()).generateImageFromImage(anyString(), any(byte[].class));
+    }
+
     // ---- Helpers ----
 
     private Room buildRoom(String code, GamePhase phase) {
@@ -1166,5 +1502,17 @@ class GameServiceTest {
         chain.setRoom(room);
         chain.setOriginPlayer(player);
         return chain;
+    }
+
+    private ArtStyle buildArtStyle(String name) {
+        ArtStyle s = new ArtStyle();
+        s.setName(name);
+        return s;
+    }
+
+    private List<ArtStyle> buildArtStyles(int n) {
+        return IntStream.range(0, n)
+                .mapToObj(i -> buildArtStyle("style-" + i))
+                .collect(Collectors.toList());
     }
 }

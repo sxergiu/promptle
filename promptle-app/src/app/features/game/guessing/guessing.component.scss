@@ -1,11 +1,10 @@
+@use 'breakpoints' as bp;
+
+// Layout-only container — sits directly on the tv-screen, no inner frame.
+// (Visual chrome comes from the surrounding .tv-frame / .tv-screen.)
 .phase-card {
-  background: var(--color-surface);
-  border-radius: 12px;
-  box-shadow: 4px 4px 0 var(--color-primary);
-  border: 2px solid var(--color-primary);
-  padding: 2rem;
   width: 100%;
-  max-width: 560px;
+  box-sizing: border-box;
   animation: slideUp 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -15,7 +14,7 @@
 }
 
 .phase-title {
-  font-size: 0.7rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: var(--color-primary);
   margin: 0 0 0.375rem;
@@ -23,25 +22,37 @@
 }
 
 .phase-hint {
-  font-size: 0.55rem;
+  font-size: 0.8rem;
   color: var(--color-on-surface);
   opacity: 0.55;
-  margin: 0 0 1.25rem;
+  margin: 0 0 0.75rem;
   text-align: center;
-  line-height: 1.8;
+  line-height: 1.5;
 }
 
-/* ── Image frame ── */
+/* -- Image frame -- */
 .image-frame {
   width: 100%;
+  max-width: 300px;
+  margin: 0 auto 0.75rem;
   border-radius: 8px;
   overflow: hidden;
-  margin-bottom: 1.25rem;
-  aspect-ratio: 4/3;
+  // Square to match the 512x512 generated image — no cropping.
+  aspect-ratio: 1/1;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  @include bp.sm { max-width: 340px; margin-bottom: 0.9rem; }
+  @include bp.landscape {
+    // Stay square, but let height drive size and cap it so the square never
+    // overflows the limited vertical space on standard laptop screens.
+    max-width: none;
+    max-height: min(46vh, 340px);
+    width: auto;
+    aspect-ratio: 1/1;
+    margin: 0 auto 0.5rem;
+  }
 
   // Skeleton shimmer when no image yet
   background: linear-gradient(
@@ -74,18 +85,20 @@
 }
 
 .image-loading {
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: var(--color-on-surface);
   opacity: 0.4;
   position: relative;
   z-index: 1;
+  @include bp.sm { font-size: 1.1rem; }
 }
 
-/* ── Guess input ── */
+/* -- Guess input -- */
 .guess-input {
   width: 100%;
-  padding: 0.875rem 1rem;
-  font-size: 1rem;
+  padding: 0.65rem 1rem;
+  @include bp.landscape { padding: 0.5rem 0.75rem; }
+  font-size: 1.2rem;
   font-family: inherit;
   border: 1.5px solid var(--color-border);
   border-radius: 10px;
@@ -95,31 +108,71 @@
   transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
   display: block;
+  // Single-line feel by default, but draggable to resize like the prompt field.
+  min-height: 3rem;
+  resize: vertical;
+  line-height: 1.3;
+
+  // Custom scrollbar (matches the prompt textarea)
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+  &::-webkit-scrollbar { width: 5px; }
+  &::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
+  }
 
   &:focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(153, 0, 48, 0.1);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
   }
 }
 
 .guess-input[readonly] {
-  opacity: 0.6;
-  background: var(--color-border);
   cursor: default;
+  resize: none;
+}
+
+/* -- Locked-input overlay shown after submitting -- */
+.input-wrap {
+  position: relative;
+}
+
+.submitted-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--p-green) 16%, var(--color-surface));
+  border: 1.5px solid var(--p-green);
+  color: var(--p-green);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  backdrop-filter: blur(2px);
+  animation: submittedBounceIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .card-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 1.25rem;
-  gap: 1rem;
+  margin-top: 0.75rem;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  // Reserve the CTA's height so swapping it for the waiting label doesn't jump.
+  min-height: 3.25rem;
+  @include bp.sm { margin-top: 0.9rem; gap: 1rem; }
+  @include bp.landscape { min-height: 2.6rem; }
 }
 
 .counter {
-  font-size: 0.55rem;
+  font-size: 0.8rem;
   color: var(--color-on-surface);
-  opacity: 0.6;
 
   strong {
     color: var(--color-primary);
@@ -127,13 +180,16 @@
   }
 }
 
-.submitted-label {
-  font-size: 0.55rem;
+// The "/ Y ready" label stays subtle gray; only the count (strong) reads app-red.
+.counter-text {
+  opacity: 0.6;
+}
+
+// "Waiting for others…" sits where the READY button was, in app-green.
+.waiting-label {
+  font-size: 0.8rem;
   color: var(--p-green);
   font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
   animation: submittedBounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 

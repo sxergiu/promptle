@@ -29,6 +29,8 @@ class FrameRendererTest {
         tempDir = Files.createTempDirectory("frame-renderer-test-");
     }
 
+    // Durations passed to the constructor: title=3, text=4, image=3, outro=3.
+
     @AfterEach
     void tearDown() throws IOException {
         if (tempDir != null && Files.exists(tempDir)) {
@@ -91,7 +93,7 @@ class FrameRendererTest {
 
     @Test
     void renderTextFrame_CreatesFile_WithCorrectDimensions() throws IOException {
-        frameRenderer.renderTextFrame(tempDir, "A beautiful sunset", "Alice", "icon-1", false);
+        frameRenderer.renderTextFrame(tempDir, "A beautiful sunset", "Alice", "icon-1", false, 1, 3, "Prompted");
 
         Path framePath = tempDir.resolve("frame-001.png");
         assertTrue(Files.exists(framePath), "Text frame file should exist");
@@ -102,7 +104,7 @@ class FrameRendererTest {
     void renderTextFrame_LongText_DoesNotThrow() throws IOException {
         String longText = "A ".repeat(300);
         assertDoesNotThrow(() ->
-                frameRenderer.renderTextFrame(tempDir, longText, "Alice", "icon-1", false));
+                frameRenderer.renderTextFrame(tempDir, longText, "Alice", "icon-1", false, 1, 3, "Prompted"));
 
         assertTrue(Files.exists(tempDir.resolve("frame-001.png")));
     }
@@ -110,7 +112,7 @@ class FrameRendererTest {
     @Test
     void renderTextFrame_EmptyText_DoesNotThrow() throws IOException {
         assertDoesNotThrow(() ->
-                frameRenderer.renderTextFrame(tempDir, "", "Alice", "icon-1", false));
+                frameRenderer.renderTextFrame(tempDir, "", "Alice", "icon-1", false, 1, 3, "Prompted"));
 
         assertTrue(Files.exists(tempDir.resolve("frame-001.png")));
     }
@@ -118,7 +120,7 @@ class FrameRendererTest {
     @Test
     void renderTextFrame_PlaceholderEntry_DoesNotThrow() throws IOException {
         assertDoesNotThrow(() ->
-                frameRenderer.renderTextFrame(tempDir, "Timed out", "Alice", "icon-1", true));
+                frameRenderer.renderTextFrame(tempDir, "Timed out", "Alice", "icon-1", true, 2, 3, "Guessed"));
 
         assertTrue(Files.exists(tempDir.resolve("frame-001.png")));
     }
@@ -126,7 +128,7 @@ class FrameRendererTest {
     @Test
     void renderTextFrame_NullAvatarId_FallsBackToDefault() throws IOException {
         assertDoesNotThrow(() ->
-                frameRenderer.renderTextFrame(tempDir, "Some text", "Alice", null, false));
+                frameRenderer.renderTextFrame(tempDir, "Some text", "Alice", null, false, 1, 3, "Prompted"));
 
         Path framePath = tempDir.resolve("frame-001.png");
         assertTrue(Files.exists(framePath), "Frame should still be created with null avatarId");
@@ -136,7 +138,7 @@ class FrameRendererTest {
     @Test
     void renderTextFrame_UnknownAvatarId_FallsBackToDefault() throws IOException {
         assertDoesNotThrow(() ->
-                frameRenderer.renderTextFrame(tempDir, "Some text", "Alice", "icon-99", false));
+                frameRenderer.renderTextFrame(tempDir, "Some text", "Alice", "icon-99", false, 1, 3, "Prompted"));
 
         Path framePath = tempDir.resolve("frame-001.png");
         assertTrue(Files.exists(framePath), "Frame should still be created with unknown avatarId");
@@ -149,7 +151,7 @@ class FrameRendererTest {
     void renderImageFrame_ValidPng_CreatesFile() throws IOException {
         byte[] pngBytes = createTestPng(512, 512);
 
-        frameRenderer.renderImageFrame(tempDir, pngBytes);
+        frameRenderer.renderImageFrame(tempDir, pngBytes, 1, 3);
 
         Path framePath = tempDir.resolve("frame-001.png");
         assertTrue(Files.exists(framePath), "Image frame file should exist");
@@ -163,7 +165,7 @@ class FrameRendererTest {
         // Corrupt image bytes should either throw an IOException or produce a frame
         // without the generated image embedded (implementation-dependent)
         try {
-            frameRenderer.renderImageFrame(tempDir, garbage);
+            frameRenderer.renderImageFrame(tempDir, garbage, 1, 3);
             // If it doesn't throw, frame should still exist
             assertTrue(Files.exists(tempDir.resolve("frame-001.png")));
         } catch (IOException e) {
@@ -176,7 +178,7 @@ class FrameRendererTest {
 
     @Test
     void renderOutroFrame_CreatesFile_WithCorrectDimensions() throws IOException {
-        frameRenderer.renderOutroFrame(tempDir);
+        frameRenderer.renderOutroFrame(tempDir, "ABCD1234");
 
         Path framePath = tempDir.resolve("frame-001.png");
         assertTrue(Files.exists(framePath), "Outro frame file should exist");
@@ -190,10 +192,10 @@ class FrameRendererTest {
         byte[] pngBytes = createTestPng(256, 256);
 
         frameRenderer.renderTitleFrame(tempDir, "Alice", "ABCD1234");
-        frameRenderer.renderTextFrame(tempDir, "First prompt", "Alice", "icon-1", false);
-        frameRenderer.renderTextFrame(tempDir, "Second prompt", "Bob", "icon-2", false);
-        frameRenderer.renderImageFrame(tempDir, pngBytes);
-        frameRenderer.renderOutroFrame(tempDir);
+        frameRenderer.renderTextFrame(tempDir, "First prompt", "Alice", "icon-1", false, 1, 2, "Prompted");
+        frameRenderer.renderTextFrame(tempDir, "Second prompt", "Bob", "icon-2", false, 2, 2, "Guessed");
+        frameRenderer.renderImageFrame(tempDir, pngBytes, 2, 2);
+        frameRenderer.renderOutroFrame(tempDir, "ABCD1234");
 
         assertEquals(5, frameRenderer.getFrameCount());
         assertTrue(Files.exists(tempDir.resolve("frame-001.png")), "frame-001 should exist");
@@ -204,48 +206,28 @@ class FrameRendererTest {
     }
 
     @Test
-    void renderMultipleFrames_WritesFrameListFile() throws IOException {
-        frameRenderer.renderTitleFrame(tempDir, "Alice", "ABCD1234");
-        frameRenderer.renderTextFrame(tempDir, "Prompt text", "Alice", "icon-1", false);
-        frameRenderer.renderOutroFrame(tempDir);
-
-        frameRenderer.writeFrameList(tempDir);
-
-        Path framesFile = tempDir.resolve("frames.txt");
-        assertTrue(Files.exists(framesFile), "frames.txt should exist after writeFrameList()");
-        String content = Files.readString(framesFile);
-        assertFalse(content.isBlank(), "frames.txt should not be empty");
-    }
-
-    @Test
-    void renderMultipleFrames_FrameListHasCorrectDurations() throws IOException {
+    void getFrames_ExposesOrderedFramesWithDurations() throws IOException {
         byte[] pngBytes = createTestPng(256, 256);
 
-        // title (duration=3), text (duration=4), image (duration=3), outro (duration=3)
+        // title (3), text (4), image (3), outro (3)
         frameRenderer.renderTitleFrame(tempDir, "Alice", "ABCD1234");
-        frameRenderer.renderTextFrame(tempDir, "A prompt", "Alice", "icon-1", false);
-        frameRenderer.renderImageFrame(tempDir, pngBytes);
-        frameRenderer.renderOutroFrame(tempDir);
+        frameRenderer.renderTextFrame(tempDir, "A prompt", "Alice", "icon-1", false, 1, 1, "Prompted");
+        frameRenderer.renderImageFrame(tempDir, pngBytes, 1, 1);
+        frameRenderer.renderOutroFrame(tempDir, "ABCD1234");
 
-        frameRenderer.writeFrameList(tempDir);
+        var frames = frameRenderer.getFrames();
+        assertEquals(4, frames.size(), "Expected 4 frame specs");
 
-        String content = Files.readString(tempDir.resolve("frames.txt"));
-        String[] lines = content.split("\n");
+        assertEquals("frame-001.png", frames.get(0).filename());
+        assertEquals(3.0, frames.get(0).duration(), 0.0001, "Title frame duration");
 
-        // Each frame has 2 lines: "file '...'" and "duration N"
-        assertEquals(8, lines.length, "Expected 8 lines (4 frames x 2 lines each)");
+        assertEquals("frame-002.png", frames.get(1).filename());
+        assertEquals(4.0, frames.get(1).duration(), 0.0001, "Text frame duration");
 
-        // Verify frame filenames and durations
-        assertTrue(lines[0].contains("frame-001.png"), "First file entry");
-        assertTrue(lines[1].contains("duration 3"), "Title frame duration should be 3");
+        assertEquals("frame-003.png", frames.get(2).filename());
+        assertEquals(3.0, frames.get(2).duration(), 0.0001, "Image frame duration");
 
-        assertTrue(lines[2].contains("frame-002.png"), "Second file entry");
-        assertTrue(lines[3].contains("duration 4"), "Text frame duration should be 4");
-
-        assertTrue(lines[4].contains("frame-003.png"), "Third file entry");
-        assertTrue(lines[5].contains("duration 3"), "Image frame duration should be 3");
-
-        assertTrue(lines[6].contains("frame-004.png"), "Fourth file entry");
-        assertTrue(lines[7].contains("duration 3"), "Outro frame duration should be 3");
+        assertEquals("frame-004.png", frames.get(3).filename());
+        assertEquals(3.0, frames.get(3).duration(), 0.0001, "Outro frame duration");
     }
 }

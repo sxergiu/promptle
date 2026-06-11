@@ -1,50 +1,5 @@
-<div class="join-shell">
-  <header class="join-header page-header">
-    <h1 class="logo">Promptle</h1>
-    <p class="tagline">The AI Telephone</p>
-  </header>
-
-  <main class="join-body">
-    <div class="join-main">
-      <div class="avatar-section">
-        <img [src]="selectedIcon.path" [alt]="selectedIcon.id" class="avatar-img" />
-        <button type="button" mat-button class="shuffle-btn" (click)="shuffleIcon()" aria-label="Shuffle avatar">
-          &#x21BB; Shuffle
-        </button>
-      </div>
-
-      <div class="form-section">
-        <mat-form-field appearance="outline">
-          <input
-            matInput
-            type="text"
-            [value]="alias()"
-            (input)="alias.set($any($event.target).value)"
-            placeholder="Enter your name"
-            aria-label="Alias"
-          />
-        </mat-form-field>
-
-        @if (errorMessage) {
-          <div class="error-message">{{ errorMessage }}</div>
-        }
-
-        <button
-          type="button"
-          mat-raised-button
-          class="join-room-btn"
-          [disabled]="!alias().trim()"
-          (click)="onJoinRoom()"
-        >
-          Continue to Room
-        </button>
-      </div>
-    </div>
-  </main>
-
-  <footer class="join-footer">
-    <a href="#" class="footer-link">How to Play</a>
-    <a href="#" class="footer-link">About</a>
-    <a href="#" class="footer-link">Privacy Policy</a>
-  </footer>
-</div>
+<app-player-setup
+  [errorMessage]="errorMessage()"
+  [busy]="busy()"
+  (play)="onJoinRoom($event)"
+></app-player-setup>

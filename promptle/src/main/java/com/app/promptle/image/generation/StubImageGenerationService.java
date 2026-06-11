@@ -20,8 +20,8 @@ public class StubImageGenerationService implements ImageGenerationService {
 
     public StubImageGenerationService(ImageStorageService imageStorageService) throws IOException {
         this.imageStorageService = imageStorageService;
-        try (InputStream is = getClass().getClassLoader().getResourceAsStream("stub-image.png")) {
-            if (is == null) throw new IOException("stub-image.png not found on classpath");
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream("stub-images/stub-image.png")) {
+            if (is == null) throw new IOException("stub-images/stub-image.png not found on classpath");
             this.stubImageBytes = is.readAllBytes();
         }
     }

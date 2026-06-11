@@ -7,7 +7,8 @@ import { GuessingPhaseComponent } from './guessing/guessing.component';
 import { RoomApiService } from '../../core/services/room-api.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { PlayerService } from '../../core/services/player.service';
-import { PhaseChangedEvent, SubmissionUpdateEvent, RoundReadyPayload, GameResultsEvent } from '../../core/models/events.model';
+import { SoundService } from '../../core/services/sound.service';
+import { PhaseChangedEvent, SubmissionUpdateEvent, RoundReadyPayload, GameResultsEvent, RoomEvent } from '../../core/models/events.model';
 import { PlayerDto } from '../../core/models/player.model';
 
 @Component({
@@ -39,6 +40,9 @@ export class GameComponent implements OnInit, OnDestroy {
   // Set to true once any WS phase event has been applied. Used to prevent a
   // stale HTTP snapshot from overwriting live WS state when both arrive concurrently.
   private _wsPhaseReceived = false;
+  // "phase#round" of the last applied phase, so re-delivered events (reconnect,
+  // duplicate broadcast) don't wipe hasSubmitted/submittedCount mid-round.
+  private _lastPhaseKey = '';
 
   readonly remainingSeconds = computed(() => {
     this._tick(); // reactive dependency — re-evaluates every second
@@ -52,8 +56,18 @@ export class GameComponent implements OnInit, OnDestroy {
     return (this.remainingSeconds() / total) * 100;
   });
 
+  // One entry per player for the bottom readiness strip — true once that slot
+  // has submitted (green pip), false while we're still waiting (red pip).
+  readonly readyPips = computed(() =>
+    Array.from({ length: this.totalPlayerCount() }, (_, i) => i < this.submittedCount())
+  );
+
   roomCode = '';
   private playerToken = '';
+
+  // Last whole-second value of remainingSeconds seen by the timer-cue effect, so
+  // warnings fire once on the downward crossing and never on a round's timer reset.
+  private _lastRemaining = Infinity;
 
   constructor(
     private route: ActivatedRoute,
@@ -61,11 +75,24 @@ export class GameComponent implements OnInit, OnDestroy {
     private roomApiService: RoomApiService,
     private webSocketService: WebSocketService,
     private playerService: PlayerService,
+    private sound: SoundService,
   ) {
     effect(() => {
       if (this.phase() === GamePhase.RESULTS) {
         this.router.navigate(['/game', this.roomCode, 'results'], { state: { chains: this._pendingChains, hostId: this._hostId, players: this.players() } });
       }
+    });
+
+    // Timer cues: fire only on a live downward tick during a timed phase, so a
+    // round's fresh timer (remaining jumps up) and hydration never trigger them.
+    effect(() => {
+      const r = this.remainingSeconds();
+      const timed = this.phase() === GamePhase.PROMPTING || this.phase() === GamePhase.GUESSING;
+      if (timed && r < this._lastRemaining) {
+        if (r === 10 || r === 5) this.sound.timerWarning();
+        else if (r === 3) this.sound.timerFinal();
+      }
+      this._lastRemaining = r;
     });
   }
 
@@ -117,7 +144,7 @@ export class GameComponent implements OnInit, OnDestroy {
           this.totalPlayerCount.set((subEvent as any).totalCount ?? this.totalPlayerCount());
         } else if ('chains' in payload) {
           this._pendingChains = (payload as any).chains;
-          this.phase.set(GamePhase.RESULTS);
+          this._enterResults();
         }
       });
 
@@ -126,12 +153,22 @@ export class GameComponent implements OnInit, OnDestroy {
         if ('chains' in payload) {
           const resultsEvent = event as GameResultsEvent;
           this._pendingChains = resultsEvent.chains;
-          this.phase.set(GamePhase.RESULTS);
+          this._enterResults();
         } else {
           // RoundReadyPayload — still accept it if it arrives (updates imageUrl faster than HTTP).
           const roundReady = event as RoundReadyPayload;
           this.imageUrl.set(roundReady.imageUrl);
+          this.sound.imageReady();
         }
+      });
+
+      // Track host changes during the game (e.g. the host's WS drops during a long GENERATING
+      // phase and the server reassigns host). Without this, _hostId stays stale and the wrong
+      // hostId is handed to the results screen — leaving the showcase with no one able to advance.
+      this.webSocketService.subscribe(`/topic/room/${this.roomCode}`, (event: unknown) => {
+        const roomEvent = event as RoomEvent;
+        if (roomEvent?.hostId) this._hostId = roomEvent.hostId;
+        if (roomEvent?.players) this.players.set(roomEvent.players);
       });
     }, 5000, () => this.wsConnected.set(false));
   }
@@ -152,6 +189,11 @@ export class GameComponent implements OnInit, OnDestroy {
           this.imageUrl.set(snapshot.imageUrl);
           this.hasSubmitted.set(snapshot.hasSubmitted);
           this.submittedCount.set(snapshot.submittedCount);
+          this._lastPhaseKey = snapshot.phase + '#' + snapshot.currentRound;
+        } else if (snapshot.phase + '#' + snapshot.currentRound === this._lastPhaseKey) {
+          // WS won the race for the same phase/round — the snapshot is still
+          // authoritative for this player's submission state in that round.
+          this.hasSubmitted.set(snapshot.hasSubmitted);
         }
       },
     });
@@ -169,6 +211,17 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   private _applyPhaseEvent(e: PhaseChangedEvent): void {
+    const key = e.phase + '#' + e.round;
+    if (key === this._lastPhaseKey) {
+      // Re-delivery of the current phase (reconnect / duplicate broadcast):
+      // refresh the timer base but don't reset submission state — a reset
+      // would wipe the child form via ngOnChanges.
+      this.timerSeconds.set(e.timerSeconds);
+      this.serverTimestamp.set(e.serverTimestamp);
+      this.totalRounds.set(e.totalRounds);
+      return;
+    }
+    this._lastPhaseKey = key;
     this.phase.set(e.phase);
     this.currentRound.set(e.round);
     this.totalRounds.set(e.totalRounds);
@@ -176,6 +229,21 @@ export class GameComponent implements OnInit, OnDestroy {
     this.serverTimestamp.set(e.serverTimestamp);
     this.hasSubmitted.set(false);
     this.submittedCount.set(0);
+
+    // Phase-entry cue. Fires only here — i.e. only on a live WS phase change, never
+    // on the HTTP-snapshot hydration path (which sets `phase` directly).
+    if (e.phase === GamePhase.PROMPTING || e.phase === GamePhase.GUESSING) {
+      this.sound.roundStart();
+    } else if (e.phase === GamePhase.GENERATING) {
+      this.sound.phaseGenerating();
+    }
+  }
+
+  /** Enter RESULTS from a live event, firing the reveal cue once (shell owns it). */
+  private _enterResults(): void {
+    if (this.phase() === GamePhase.RESULTS) return; // both RESULTS events arrived — don't double-fire
+    this.sound.resultsReveal();
+    this.phase.set(GamePhase.RESULTS);
   }
 
   ngOnDestroy(): void {

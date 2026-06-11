@@ -1,78 +1,150 @@
 
-    <div class="results-shell">
-      <header class="results-header page-header">
-        <h1 class="results-title">Results</h1>
-        <span class="chain-indicator">Chain {{ currentChainIndex() + 1 }} / {{ chains().length }}</span>
-      </header>
-
-      <div class="chain-dots">
-        @for (chain of chains(); track $index; let i = $index) {
-          <div class="dot"
-               [class.active]="i === currentChainIndex()"
-               [class.done]="i < currentChainIndex()"
-               [class.clickable]="i < currentChainIndex() || allChainsCompleted()"
-               (click)="navigateToChain(i)"
-               [attr.title]="(i < currentChainIndex() || allChainsCompleted()) ? 'Chain ' + (i + 1) : null">
-          </div>
-        }
-      </div>
-
-      <div class="entries-feed">
-        @for (chain of chains(); track $index) {
-          @if ($index === currentChainIndex()) {
-            @for (entry of chain.entries; track $index; let i = $index) {
-              @if (i < revealedEntryCount()) {
-                <div class="entry-row">
-                  <div class="entry-bubble-wrap">
-                    @if (entry.avatarId) {
-                      <img [src]="getAvatarPath(entry.avatarId)" class="entry-avatar" [alt]="entry.avatarId" />
-                    } @else {
-                      <div class="entry-avatar"></div>
-                    }
-                    <div class="entry-content">
-                      <div class="entry-author">
-                        {{ getPlayerName(entry.playerId) }}{{ entry.isPlaceholder ? ' (skipped)' : '' }}
-                      </div>
-                      <div class="entry-bubble" [class.placeholder-bubble]="entry.isPlaceholder">
-                        {{ entry.text }}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                @if (entry.imageUrl) {
-                  <div class="entry-row entry-row--image">
-                    <div class="entry-bubble-wrap entry-bubble-wrap--right">
-                      <div class="entry-content entry-content--right">
-                        <div class="entry-author entry-author--right">Promptle</div>
-                        <div class="entry-image-bubble">
-                          <img [src]="entry.imageUrl" class="entry-image" alt="Generated image" />
+    <div class="screen-shell">
+      <div class="tv-frame tv-frame--tall">
+        <div class="results-header">
+          <span class="chain-indicator">Chain {{ currentChainIndex() + 1 }} / {{ chains().length }}</span>
+        </div>
+        <div class="tv-screen">
+          <div class="results-content">
+            <div class="entries-feed" #entriesFeed>
+              @for (chain of chains(); track $index) {
+                @if ($index === currentChainIndex()) {
+                  @for (entry of chain.entries; track $index; let i = $index) {
+                    @if (isTextRevealed(i)) {
+                      <div class="entry-row">
+                        <div class="entry-bubble-wrap">
+                          @if (entry.avatarId) {
+                            <img [src]="getAvatarPath(entry.avatarId)" class="entry-avatar" [class.settled]="isTextSettled(i)" [alt]="entry.avatarId" />
+                          } @else {
+                            <div class="entry-avatar" [class.settled]="isTextSettled(i)"></div>
+                          }
+                          <div class="entry-content">
+                            <div class="entry-bubble" [class.placeholder-bubble]="entry.isPlaceholder">
+                              @if (entry.isPlaceholder) {
+                                <span class="entry-skipped-badge">skipped</span>
+                              }
+                              <div class="entry-author">
+                                {{ getPlayerName(entry.playerId) }}
+                              </div>
+                              {{ displayedText(i, entry.text) }}@if (isTyping(i)) {<span class="type-caret"></span>}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <img src="logos.ico" class="entry-avatar entry-avatar--app" alt="Promptle" />
-                    </div>
-                  </div>
+                    }
+                    @if (entry.imageUrl && isImageRevealed(i)) {
+                      <div class="entry-row entry-row--image">
+                        <div class="entry-bubble-wrap entry-bubble-wrap--right">
+                          <div class="entry-content entry-content--right">
+                            <div class="entry-image-bubble">
+                              <img [src]="entry.imageUrl" class="entry-image" alt="Generated image" (load)="onImageLoaded()" />
+                            </div>
+                          </div>
+                          <img src="logos.ico" class="entry-avatar entry-avatar--app" [class.settled]="isImageSettled(i)" alt="Promptle" />
+                        </div>
+                      </div>
+                    }
+                  }
+
+                  @if (visiblePendingStep(); as pending) {
+                    @if (pending.kind === 'text') {
+                      <!-- Next player's message is "being typed" -->
+                      <div class="entry-row entry-row--typing">
+                        <div class="entry-bubble-wrap">
+                          @if (chain.entries[pending.entryIndex].avatarId) {
+                            <img [src]="getAvatarPath(chain.entries[pending.entryIndex].avatarId!)" class="entry-avatar" alt="" />
+                          } @else {
+                            <div class="entry-avatar"></div>
+                          }
+                          <div class="entry-content">
+                            <div class="entry-bubble typing-bubble" aria-label="Typing…">
+                              <span class="typing-dot"></span>
+                              <span class="typing-dot"></span>
+                              <span class="typing-dot"></span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    } @else {
+                      <!-- Promptle is "drawing" the next image -->
+                      <div class="entry-row entry-row--typing entry-row--image">
+                        <div class="entry-bubble-wrap entry-bubble-wrap--right">
+                          <div class="entry-content entry-content--right">
+                            <div class="entry-bubble typing-bubble typing-bubble--image" aria-label="Drawing…">
+                              <span class="typing-dot"></span>
+                              <span class="typing-dot"></span>
+                              <span class="typing-dot"></span>
+                            </div>
+                          </div>
+                          <img src="logos.ico" class="entry-avatar entry-avatar--app" alt="Promptle" />
+                        </div>
+                      </div>
+                    }
+                  }
                 }
               }
-            }
-          }
-        }
-      </div>
 
-      <div class="results-actions">
-        <button mat-icon-button
-                (click)="onExportThread()"
-                [disabled]="exporting()"
-                aria-label="Export thread"
-                title="Export thread">
-          <mat-icon>{{ exporting() ? 'hourglass_empty' : 'download' }}</mat-icon>
-        </button>
-        <button
-          mat-raised-button
-          class="btn-green"
-          [disabled]="!canProceed() || (currentChainIndex() < chains().length - 1 && !isHost())"
-          (click)="currentChainIndex() < chains().length - 1 ? onNextChain() : onBackToLobby()"
-        >
-          {{ currentChainIndex() < chains().length - 1 ? 'Next Chain →' : 'Back to Lobby' }}
-        </button>
+              @if (allRevealed()) {
+                <div class="gif-separator"></div>
+                <button
+                  type="button"
+                  class="gif-inline"
+                  [disabled]="exporting()"
+                  (click)="onExportThread()"
+                >
+                  <span class="gif-inline-icon">
+                    <img
+                      src="app-icons/promptle-export.svg"
+                      class="gif-icon-img gif-icon-default"
+                      alt=""
+                    />
+                    <img
+                      src="app-icons/promptle-export-hover.svg"
+                      class="gif-icon-img gif-icon-hover"
+                      alt=""
+                    />
+                  </span>
+                  <span class="gif-inline-label">{{ exporting() ? 'Exporting…' : 'GIF' }}</span>
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="results-actions">
+          <div class="chain-dots" [class.chain-dots--showcase]="!allChainsCompleted()">
+            @for (chain of chains(); track $index; let i = $index) {
+              <div class="dot"
+                   [class.active]="i === currentChainIndex()"
+                   [class.clickable]="allChainsCompleted()"
+                   (click)="navigateToChain(i)"
+                   [attr.data-tooltip]="allChainsCompleted() ? 'Chain ' + (i + 1) : null">
+              </div>
+            }
+          </div>
+
+          <div class="results-buttons">
+            @if (allChainsCompleted()) {
+              <button
+                type="button"
+                class="btn-secondary"
+                (click)="onBackToLobby()"
+              >
+                <img src="app-icons/promptle-arrow-left.svg" class="btn-icon" alt="" /> LOBBY
+              </button>
+            }
+
+            @if (isHost() && !allChainsCompleted()) {
+              <button
+                type="button"
+                class="btn-secondary"
+                [disabled]="!canProceed()"
+                (click)="onNextChain()"
+              >
+                <img src="app-icons/promptle-next.svg" class="btn-icon" alt="" /> NEXT
+              </button>
+            }
+          </div>
+        </div>
       </div>
     </div>

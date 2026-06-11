@@ -1,34 +1,20 @@
-:host { display: flex; flex-direction: column; min-height: 100vh; }
+@use 'breakpoints' as bp;
 
-.game-shell {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
+// Neon "Time is running out" sign lives in global styles.scss (.neon-sign,
+// .neon-sign--game) so the home/loading screens can reuse the same look.
 
-/* ── Header ── */
-.game-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  padding: 0.75rem 1.5rem 0;
-
-  // Inherit gradient + confetti from page-header utility class
-  // (applied via class binding in the template)
-}
-
-.header-row {
+/* -- Status bar (on bezel) -- */
+.game-status-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
-  position: relative;
+  padding: 0 4px 8px;
 }
 
 .round-badge {
-  font-size: 0.55rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: rgba(255, 255, 255, 0.5);
   opacity: 0.9;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -36,9 +22,12 @@
 
 /* Timer number */
 .timer-display {
-  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 1.1rem;
   font-weight: 800;
-  color: var(--color-primary);
+  color: rgba(255, 255, 255, 0.8);
   min-width: 3.5rem;
   text-align: right;
   transition: color 0.3s;
@@ -51,10 +40,30 @@
   animation: timerFlash 0.8s ease-in-out infinite;
 }
 
-// Scale tick animation for urgency (fires every second when ≤10s)
+// Scale tick animation for urgency (fires every second when <=10s)
 .timer-display.warning .tick {
   display: inline-block;
   animation: timerScale 1s ease-in-out infinite;
+}
+
+// Alarm-clock icon: grows and rocks back and forth like a ringing bell
+.timer-display.warning .btn-icon {
+  transform-origin: 50% 60%;
+  animation: alarmRing 0.6s ease-in-out infinite;
+}
+
+// Initial attention pulse: when PROMPTING opens, the clock breathes a few times
+// to reinforce the "Time is running out" sign, then settles. Finite iteration
+// count means it plays once on mount and stops — the .warning alarm (more
+// specific) takes over if the timer later runs low.
+.btn-icon--attn {
+  transform-origin: 50% 60%;
+  animation: timerAttention 0.85s ease-in-out 4;
+}
+
+@keyframes timerAttention {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(2); }
 }
 
 @keyframes timerFlash {
@@ -67,13 +76,22 @@
   50% { transform: scale(1.12); }
 }
 
-/* Timer bar — gradient fill */
+@keyframes alarmRing {
+  0%   { transform: scale(1.3) rotate(0deg); }
+  10%  { transform: scale(1.3) rotate(-20deg); }
+  30%  { transform: scale(1.3) rotate(18deg); }
+  50%  { transform: scale(1.3) rotate(-13deg); }
+  70%  { transform: scale(1.3) rotate(9deg); }
+  85%  { transform: scale(1.3) rotate(-5deg); }
+  100% { transform: scale(1.3) rotate(0deg); }
+}
+
+/* Timer bar — gradient fill, flush with tv-screen top */
 .timer-track {
   height: 5px;
   background: rgba(255, 255, 255, 0.25);
-  border-radius: 3px;
   overflow: hidden;
-  margin: 0 -1.5rem;
+  margin: 0;
   position: relative;
 }
 
@@ -82,7 +100,6 @@
   background: linear-gradient(90deg, var(--p-green) 0%, #a8c05e 50%, var(--color-primary) 100%);
   background-size: 200% 100%;
   background-position: 0% 0%;
-  border-radius: 3px;
   transition: width 0.95s linear, background-position 0.95s linear;
 }
 
@@ -91,14 +108,27 @@
   background-size: 100% 100%;
 }
 
-/* ── Phase area ── */
+/* -- Phase area -- */
 .game-phase {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem 1rem;
+  // Portrait guessing wants breathing room on the sides for the ready count,
+  // button and input field, so keep a comfortable horizontal pad here.
+  padding: 1.5rem 1rem;
   animation: phaseFadeIn 0.35s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  @include bp.sm { padding: 2rem 0.75rem; }
+  @include bp.landscape { padding: 0.75rem 0.5rem; }
+}
+
+/* Prompting phase — portrait gets generous side padding so the content inside
+   the tv screen isn't flush against the edges; wider/landscape screens trim it
+   back since they have less vertical room and a roomier frame. */
+.game-phase--flush {
+  padding-left: 1rem;
+  padding-right: 1rem;
+  @include bp.sm { padding-left: 0.5rem; padding-right: 0.5rem; }
+  @include bp.landscape { padding-left: 0.5rem; padding-right: 0.5rem; }
 }
 
 @keyframes phaseFadeIn {
@@ -106,17 +136,47 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Reconnecting toast ── */
+/* -- Readiness strip on the bottom bezel, mirroring the top status bar -- */
+.ready-pips {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.4rem;
+  // Mirror .game-status-bar (which uses `0 4px 8px` on the top bezel).
+  padding: 8px 4px 0;
+}
+
+.pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  // Not yet submitted reads app-red; flips to app-green once that player is in.
+  background: var(--p-red);
+  transition: background 0.3s, transform 0.3s;
+}
+
+.pip--filled {
+  background: var(--p-green);
+  animation: pipPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes pipPop {
+  0%   { transform: scale(0.4); }
+  60%  { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* -- Reconnecting toast -- */
 .reconnecting-overlay {
   position: fixed;
-  bottom: 1.5rem;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   background: var(--color-overlay-bg);
   color: #fff;
   padding: 0.55rem 1.4rem;
   border-radius: 999px;
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   z-index: 100;
@@ -125,6 +185,8 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  max-width: calc(100vw - 2rem);
+  @include bp.sm { font-size: 1.1rem; }
 
   &::before {
     content: '';
@@ -133,6 +195,7 @@
     height: 8px;
     border-radius: 50%;
     background: var(--color-danger);
+    flex-shrink: 0;
     animation: reconnectPulse 1.2s ease-in-out infinite;
   }
 }

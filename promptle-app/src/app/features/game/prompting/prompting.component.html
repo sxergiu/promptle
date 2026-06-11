@@ -1,27 +1,38 @@
 
     <div class="phase-card">
-      <p class="phase-title">What should the AI create?</p>
-      <p class="phase-hint">Describe an image — the more creative the better.</p>
-      <textarea
-        class="prompt-textarea"
-        [readOnly]="submitted()"
-        [value]="promptText()"
-        (input)="promptText.set($any($event.target).value)"
-        placeholder="A cat riding a rocket to the moon…"
-      ></textarea>
+      <p class="phase-title">What shall the telepromptle create?</p>
+      <p class="phase-hint">Describe an image in your mind to fabricate into reality.</p>
+      <div class="input-wrap">
+        <textarea
+          class="prompt-textarea"
+          [readOnly]="submitted()"
+          [value]="promptText()"
+          (input)="promptText.set($any($event.target).value)"
+          (keydown.enter)="$event.preventDefault(); onSubmit()"
+          placeholder="A cat riding a rocket to the moon…"
+        ></textarea>
+        @if (submitted()) {
+          <div class="submitted-overlay">
+            <span>Submitted</span>
+          </div>
+        }
+      </div>
       <div class="card-footer">
-        <span class="counter">
-          @if (submitted()) {
-            <span class="submitted-label">✓ Submitted — waiting for others</span>
-          } @else {
-            <strong>{{ submittedCount }}</strong> / {{ totalCount }} ready
-          }
+        <span class="counter" [class.counter--done]="submitted()">
+          <span class="counter-text"><strong>{{ submittedCount }}</strong> / {{ totalCount }} ready</span>
         </span>
-        <button
-          mat-raised-button
-          color="primary"
-          [disabled]="submitted() || promptText().trim().length === 0"
-          (click)="onSubmit()"
-        >Ready</button>
+        @if (submitted()) {
+          <span class="waiting-label">Waiting for others…</span>
+        } @else {
+          <button
+            type="button"
+            class="btn-cta btn-cta--urgent"
+            [disabled]="promptText().trim().length === 0"
+            (click)="onSubmit()"
+          >
+            <img src="app-icons/promptle-check-light.svg" class="btn-icon btn-icon--check" alt="" />
+            READY
+          </button>
+        }
       </div>
     </div>

@@ -1,8 +1,40 @@
 <div class="generating-wrap">
-  <div class="spinner-wrap">
-    <div class="spinner"></div>
-    <div class="spinner-outer"></div>
-  </div>
   <p class="generating-title">Generating Images</p>
-  <p class="generating-sub">The AI is painting your prompts…</p>
+  <p class="generating-warning">Warning: leaving the application might lead to a corrupted session</p>
+
+  <div class="phone-float">
+    <div class="pixel-canvas"
+         [class.heartbeating]="heartbeating()"
+         [style.grid-template-columns]="'repeat(' + gridCols + ', 1fr)'"
+         (click)="onCanvasTap($event)">
+      @for (cell of cells(); track cell.id) {
+        <div class="pixel-cell"
+             [class]="'pixel-cell pixel-cell--' + cell.type"
+             [style.background-color]="cell.color"
+             [class.popped]="poppedCells().has(cell.id)"
+             [class.ringing]="ringing() && cell.type === 'phone'"
+             [class.btn-pressed]="cell.type === 'button' && pressedButton() >= 0 && pressedButton() === buttonIndex(cell)">
+        </div>
+      }
+      @for (particle of particles(); track particle.id) {
+        <div class="particle"
+             [style.left.px]="particle.x"
+             [style.top.px]="particle.y"
+             [style.background-color]="particle.color"
+             [style.--dx]="particle.dx + 'px'"
+             [style.--dy]="particle.dy + 'px'">
+        </div>
+      }
+    </div>
+    <div class="neon-sign neon-sign--loading" aria-hidden="true">
+      <span class="neon-sign__text">
+        <span class="ta-line"><span class="lit-r fx-a">P</span><span class="dead">l</span><span class="lit-g fx-a">e</span><span class="lit-r fx-b">a</span><span class="dead">s</span><span class="lit-g fx-b">e</span></span>
+        <span class="ta-line"><span class="lit-r fx-c">w</span><span class="dead">a</span><span class="lit-g fx-c">i</span><span class="lit-r fx-d">t</span></span>
+      </span>
+    </div>
+  </div>
+
+  <p class="generating-message" [class.visible]="messageVisible()">
+    {{ currentMessage() }}
+  </p>
 </div>

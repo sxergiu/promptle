@@ -1,21 +1,25 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { PromptingPhaseComponent } from './prompting.component';
 import { WebSocketService } from '../../../core/services/websocket.service';
+import { SoundService } from '../../../core/services/sound.service';
 
 describe('PromptingPhaseComponent', () => {
   let component: PromptingPhaseComponent;
   let fixture: ComponentFixture<PromptingPhaseComponent>;
   let wsSpy: jasmine.SpyObj<WebSocketService>;
+  let soundSpy: jasmine.SpyObj<SoundService>;
 
   const ROOM_CODE = 'GAME1234';
 
   beforeEach(async () => {
     wsSpy = jasmine.createSpyObj('WebSocketService', ['send', 'connect', 'disconnect', 'subscribe']);
+    soundSpy = jasmine.createSpyObj('SoundService', ['submitConfirm']);
 
     await TestBed.configureTestingModule({
       imports: [PromptingPhaseComponent],
       providers: [
         { provide: WebSocketService, useValue: wsSpy },
+        { provide: SoundService, useValue: soundSpy },
       ],
     }).compileComponents();
 
@@ -99,6 +103,18 @@ describe('PromptingPhaseComponent', () => {
       `/app/room/${ROOM_CODE}/prompt`,
       jasmine.objectContaining({ text: promptText })
     );
+  });
+
+  it('plays the submitConfirm cue on the local player\'s own submission', () => {
+    component.promptText.set('A serene lake');
+    component.onSubmit();
+    expect(soundSpy.submitConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not play submitConfirm on an empty/blocked submission', () => {
+    component.promptText.set('   ');
+    component.onSubmit();
+    expect(soundSpy.submitConfirm).not.toHaveBeenCalled();
   });
 
   it('sets submitted to true and locks the textarea after click', () => {

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- Dark-theme variant of promptle-sound-off. The .sound-toggle invert(1) filter
+     flips this art for dark backgrounds; the X is pre-inverted (#33cca7) so it
+     renders as the app burgundy (#cc3358) instead of a stray cyan. -->
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="16px" height="16px" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g><path style="opacity:1" fill="#080808" d="M 6.5,0.5 C 7.64697,4.64631 7.81364,8.97964 7,13.5C 5.00146,11.7468 2.83479,10.4135 0.5,9.5C 0.5,7.83333 0.5,6.16667 0.5,4.5C 2.87975,3.74658 4.87975,2.41324 6.5,0.5 Z"/></g>
+<g><path style="opacity:1" fill="#575757" d="M 4.5,8.5 C 5.83333,7.5 5.83333,6.5 4.5,5.5C 6.03726,2.99937 6.70392,3.49937 6.5,7C 6.70392,10.5006 6.03726,11.0006 4.5,8.5 Z"/></g>
+<g><path style="opacity:1" fill="#33cca7" d="M 8.5,4.5 C 9.79266,3.35521 10.9593,3.68854 12,5.5C 14.9835,3.29271 15.1502,3.79271 12.5,7C 14.7073,9.98351 14.2073,10.1502 11,7.5C 8.01649,9.70729 7.84982,9.20729 10.5,6C 9.9558,5.28281 9.28913,4.78281 8.5,4.5 Z"/></g>
+<g><path style="opacity:1" fill="#888988" d="M 4.5,5.5 C 5.83333,6.5 5.83333,7.5 4.5,8.5C 3.73747,7.73209 2.73747,7.23209 1.5,7C 2.73747,6.76791 3.73747,6.26791 4.5,5.5 Z"/></g>
+</svg>

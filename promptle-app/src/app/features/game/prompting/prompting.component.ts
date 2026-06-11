@@ -1,11 +1,11 @@
 import { Component, Input, OnInit, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { WebSocketService } from '../../../core/services/websocket.service';
+import { SoundService } from '../../../core/services/sound.service';
 
 @Component({
   selector: 'app-prompting',
   standalone: true,
-  imports: [MatButtonModule],
+  imports: [],
   styleUrl: './prompting.component.scss',
   templateUrl: './prompting.component.html',
 })
@@ -18,7 +18,7 @@ export class PromptingPhaseComponent implements OnInit {
   promptText = signal<string>('');
   submitted = signal<boolean>(false);
 
-  constructor(private webSocketService: WebSocketService) {}
+  constructor(private webSocketService: WebSocketService, private sound: SoundService) {}
 
   ngOnInit(): void {
     if (this.hasSubmitted) {
@@ -30,5 +30,6 @@ export class PromptingPhaseComponent implements OnInit {
     if (this.submitted() || this.promptText().trim().length === 0) return;
     this.webSocketService.send(`/app/room/${this.roomCode}/prompt`, { text: this.promptText() });
     this.submitted.set(true);
+    this.sound.submitConfirm();
   }
 }

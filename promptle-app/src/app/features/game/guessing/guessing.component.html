@@ -1,7 +1,7 @@
 
     <div class="phase-card">
-      <p class="phase-title">What was the prompt for this image?</p>
-      <p class="phase-hint">Describe what you think the original creator had in mind.</p>
+      <p class="phase-title">Can you deduct the meaning of this image?</p>
+      <p class="phase-hint">Figure out what the prompter had in mind.</p>
       <div class="image-frame">
         @if (imageUrl) {
           <img [src]="imageUrl" alt="Generated image" class="guess-image" />
@@ -9,27 +9,37 @@
           <span class="image-loading">Loading image…</span>
         }
       </div>
-      <input
-        class="guess-input"
-        type="text"
-        [readOnly]="submitted()"
-        [value]="guessText()"
-        (input)="guessText.set($any($event.target).value)"
-        placeholder="Your best guess…"
-      />
+      <div class="input-wrap">
+        <textarea
+          class="guess-input"
+          [readOnly]="submitted()"
+          [value]="guessText()"
+          (input)="guessText.set($any($event.target).value)"
+          (keydown.enter)="$event.preventDefault(); onSubmit()"
+          placeholder="What do you see?"
+        ></textarea>
+        @if (submitted()) {
+          <div class="submitted-overlay">
+            <span>Submitted</span>
+          </div>
+        }
+      </div>
       <div class="card-footer">
-        <span class="counter">
-          @if (submitted()) {
-            <span class="submitted-label">✓ Submitted — waiting for others</span>
-          } @else {
-            <strong>{{ submittedCount }}</strong> / {{ totalCount }} ready
-          }
+        <span class="counter" [class.counter--done]="submitted()">
+          <span class="counter-text"><strong>{{ submittedCount }}</strong> / {{ totalCount }} ready</span>
         </span>
-        <button
-          mat-raised-button
-          color="primary"
-          [disabled]="submitted() || guessText().trim().length === 0"
-          (click)="onSubmit()"
-        >Submit Guess</button>
+        @if (submitted()) {
+          <span class="waiting-label">Waiting for others…</span>
+        } @else {
+          <button
+            type="button"
+            class="btn-cta btn-cta--urgent"
+            [disabled]="guessText().trim().length === 0"
+            (click)="onSubmit()"
+          >
+            <img src="app-icons/promptle-check-light.svg" class="btn-icon btn-icon--check" alt="" />
+            READY
+          </button>
+        }
       </div>
     </div>

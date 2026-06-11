@@ -1,5 +1,6 @@
 @use 'bootstrap/scss/bootstrap';
 @use '@angular/material' as mat;
+@use 'app/breakpoints' as bp;
 
 html {
   @include mat.theme((
@@ -8,7 +9,7 @@ html {
       primary: mat.$red-palette,
       tertiary: mat.$rose-palette,
     ),
-    typography: 'Press Start 2P',
+    typography: 'Fredoka',
     density: 0,
   ));
 }
@@ -29,8 +30,10 @@ html {
   --color-on-surface: #464646;
   --color-border: #b4b4b4;
 
-  // Avatar icon circle background — white in light mode
-  --avatar-bg: #ffffff;
+  // Avatar icon circle background. Light theme: a soft, warm near-white so the
+  // pixel-art icons sit on a clean light disc (the player-setup avatar border
+  // matches this). Dark theme overrides it back to dark gray (see below).
+  --avatar-bg: #e8e4dd;
 
   // Palette tokens
   --p-green: #628266;
@@ -55,11 +58,21 @@ html {
   --bs-secondary-color: #464646;
   --bs-focus-ring-color: rgba(153, 0, 48, 0.25);
 
-  // Page background (light mode) — warm near-white grays
-  --page-bg-start: #f8f6f6;
-  --page-bg-mid: #f0ecec;
-  --page-bg-end: #f5f3f3;
-  --page-bg-last: #f8f6f6;
+  // Page background (light mode) — warm pastel ambient mesh
+  --bg-base: linear-gradient(145deg, #e7ddd6 0%, #ddd1c8 30%, #e0d5cd 60%, #e9dfd8 100%);
+  --bg-blob-1: rgba(153, 0, 48, 0.18);
+  --bg-blob-2: rgba(55, 145, 80, 0.20);
+  --bg-blob-3: rgba(215, 135, 45, 0.16);
+  --bg-blob-4: rgba(110, 60, 180, 0.14);
+  // Neon "Time is running out" sign — themed on the brand crimson/sage.
+  // Light core with a crimson halo so it reads as a lit gas tube.
+  --neon-core: #fff2f6;       // hot inner glow (near-white, pink-tinged)
+  --neon-hue: 153, 0, 48;     // crimson (#990030) halo
+  --neon-accent: 98, 130, 102; // sage green secondary glow
+  --neon-dead: rgba(74, 60, 52, 0.34); // unlit tube — faint grey
+  --bg-blob-5: rgba(210, 70, 110, 0.11);
+  --bg-blob-6: rgba(45, 155, 140, 0.14);
+  --bg-grain-opacity: 0.03;
 
   // Room page gradient — desaturated palette hues
   --room-bg-gradient: linear-gradient(135deg, #8b5a65 0%, #506858 100%);
@@ -80,12 +93,13 @@ html {
 [data-theme='dark'] {
   // Semantic bridge — dark overrides
   --color-primary: #cc3358;
-  --color-surface: #1e1e1e;
-  --color-on-surface: #e0e0e0;
-  --color-border: #464646;
+  --color-surface: #26262c;
+  --color-on-surface: #e6e6e6;
+  --color-border: #4e4e54;
 
-  // Avatar icon circle background — gray in dark mode
-  --avatar-bg: var(--color-border);
+  // Avatar background reverts to dark gray in dark mode; the player-setup avatar
+  // border matches it (border-color: var(--avatar-bg)).
+  --avatar-bg: #4e4e54;
 
   // Status colors — dark overrides
   --color-danger: #f06070;
@@ -99,7 +113,7 @@ html {
       primary: mat.$red-palette,
       tertiary: mat.$rose-palette,
     ),
-    typography: 'Press Start 2P',
+    typography: 'Fredoka',
     density: 0,
   ));
   --bs-primary: #cc3358;
@@ -111,11 +125,21 @@ html {
   --bs-secondary-color: #b4b4b4;
   --bs-focus-ring-color: rgba(204, 51, 88, 0.3);
 
-  // Page background (dark mode) — near-black
-  --page-bg-start: #0a0a0a;
-  --page-bg-mid: #141414;
-  --page-bg-end: #0f0f0f;
-  --page-bg-last: #0a0a0a;
+  // Page background (dark mode) — soft charcoal ambient (lifted off pure black)
+  --bg-base: linear-gradient(145deg, #17171d 0%, #1b1722 35%, #16191e 65%, #191522 100%);
+  --bg-blob-1: rgba(204, 51, 88, 0.22);
+  --bg-blob-2: rgba(60, 160, 90, 0.18);
+  --bg-blob-3: rgba(220, 150, 50, 0.12);
+  --bg-blob-4: rgba(100, 60, 200, 0.16);
+  --bg-blob-5: rgba(220, 80, 130, 0.10);
+  --bg-blob-6: rgba(40, 180, 160, 0.12);
+  --bg-grain-opacity: 0.05;
+
+  // Neon pops harder on the dark charcoal bg — same brand crimson halo.
+  --neon-core: #fff2f6;
+  --neon-hue: 204, 51, 88;
+  --neon-accent: 60, 160, 90;
+  --neon-dead: rgba(255, 255, 255, 0.16);
 
   // Room page gradient (muted dark versions)
   --room-bg-gradient: linear-gradient(135deg, #2a1519 0%, #151f18 100%);
@@ -181,6 +205,99 @@ html {
   }
 }
 
+// ── Pixel CTA button ──────────────────────────────────────────────────────────
+// Primary call-to-action with the pixel-art offset shadow. Default = green
+// (positive / lobby / join actions). Add .btn-cta--urgent for the in-game
+// crimson variant — meant to read as "you're on the clock".
+
+.btn-cta {
+  --cta-color: var(--color-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.25rem;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: var(--cta-color);
+  border: 3px solid var(--cta-color);
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+  @include bp.landscape { padding: 0.5rem 1rem; font-size: 0.95rem; }
+
+  &--urgent { --cta-color: var(--color-primary); }
+
+  @media (hover: hover) {
+    &:hover:not(:disabled):not([disabled]) {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.3);
+    }
+  }
+
+  &:active:not(:disabled):not([disabled]) {
+    transform: translate(1px, 1px);
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  &:disabled,
+  &[disabled] {
+    background: var(--color-border);
+    border-color: var(--color-border);
+    color: var(--color-on-surface);
+    opacity: 0.5;
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.1);
+    cursor: not-allowed;
+  }
+}
+
+// ── Pixel secondary button ────────────────────────────────────────────────────
+// Muted bordered button (LEAVE / INVITE / results actions). Layout-specific
+// width/flex is set per screen; visual chrome lives here.
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.75rem 1rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-on-surface);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  @include bp.landscape { padding: 0.4rem 0.75rem; }
+
+  @media (hover: hover) {
+    &:hover:not(:disabled):not([disabled]) {
+      transform: translate(-1px, -1px);
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
+      border-color: var(--color-on-surface);
+    }
+  }
+
+  &:active:not(:disabled):not([disabled]) {
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.1);
+  }
+
+  &:disabled,
+  &[disabled] {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
 // ── CSS-only tooltips ─────────────────────────────────────────────────────────
 // Usage: add data-tooltip="Label" to any element
 
@@ -195,7 +312,7 @@ html {
     transform: translateX(-50%);
     background: var(--p-black);
     color: var(--p-gray-light);
-    font-size: 0.7rem;
+    font-size: 0.95rem;
     font-weight: 500;
     white-space: nowrap;
     padding: 0.3rem 0.65rem;
@@ -206,34 +323,129 @@ html {
     z-index: 1060;
   }
 
-  &:hover::after {
-    opacity: 1;
+  @media (hover: hover) {
+    &:hover::after {
+      opacity: 1;
+    }
   }
 }
 
 // ── Global layout ─────────────────────────────────────────────────────────────
 
 html {
-  font-size: 14px;
+  font-size: 18px;
+  @include bp.sm { font-size: 19px; }
 }
 
 html, body {
   margin: 0;
   padding: 0;
-  min-height: 100vh;
-  font-family: 'Press Start 2P', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  height: 100vh;
+  height: 100dvh;
+  font-family: 'Fredoka', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  overflow: hidden;
 }
 
 body {
-  background: linear-gradient(160deg, var(--page-bg-start) 0%, var(--page-bg-mid) 50%, var(--page-bg-end) 100%);
-  background-attachment: fixed;
+  background: var(--bg-base);
   color: var(--color-on-surface);
+
+  // Layer 1 — large ambient blobs, slow drift
+  &::before {
+    content: '';
+    position: fixed;
+    inset: -60%;
+    width: 220%;
+    height: 220%;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 70% 55% at 10% 15%, var(--bg-blob-1) 0%, transparent 65%),
+      radial-gradient(ellipse 55% 65% at 90% 20%, var(--bg-blob-2) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 75% 85%, var(--bg-blob-3) 0%, transparent 65%),
+      radial-gradient(ellipse 50% 60% at 20% 80%, var(--bg-blob-4) 0%, transparent 60%),
+      radial-gradient(ellipse 80% 40% at 50% 45%, var(--bg-blob-5) 0%, transparent 70%);
+    animation: ambientDrift 30s ease-in-out infinite alternate;
+    filter: blur(40px);
+  }
+
+  // Layer 2 — smaller accent blobs, counter-drift + grain
+  &::after {
+    content: '';
+    position: fixed;
+    inset: -40%;
+    width: 180%;
+    height: 180%;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 40% 35% at 80% 15%, var(--bg-blob-6) 0%, transparent 60%),
+      radial-gradient(ellipse 35% 40% at 15% 60%, var(--bg-blob-3) 0%, transparent 55%),
+      radial-gradient(ellipse 45% 30% at 55% 90%, var(--bg-blob-1) 0%, transparent 60%),
+      radial-gradient(ellipse 30% 45% at 40% 10%, var(--bg-blob-2) 0%, transparent 55%);
+    animation: ambientCounterDrift 22s ease-in-out infinite alternate-reverse;
+    filter: blur(30px);
+  }
+}
+
+// Grain overlay — separate element via app-root pseudo
+app-root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: var(--bg-grain-opacity);
+  mix-blend-mode: overlay;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+}
+
+@keyframes ambientDrift {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  25% {
+    transform: translate(3%, -4%) scale(1.04) rotate(1.5deg);
+  }
+  50% {
+    transform: translate(-2%, 3%) scale(0.97) rotate(-1deg);
+  }
+  75% {
+    transform: translate(4%, 1%) scale(1.02) rotate(0.8deg);
+  }
+  100% {
+    transform: translate(-1%, -2%) scale(1.01) rotate(-0.5deg);
+  }
+}
+
+@keyframes ambientCounterDrift {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  25% {
+    transform: translate(-4%, 2%) scale(1.03) rotate(-1.2deg);
+  }
+  50% {
+    transform: translate(3%, -3%) scale(0.96) rotate(1.5deg);
+  }
+  75% {
+    transform: translate(-1%, 4%) scale(1.05) rotate(-0.7deg);
+  }
+  100% {
+    transform: translate(2%, -1%) scale(0.98) rotate(1deg);
+  }
 }
 
 app-root {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 // ── Global card utility ────────────────────────────────────────────────────────
@@ -247,57 +459,332 @@ app-root {
   -webkit-backdrop-filter: blur(2px);
 }
 
-// ── Shared page utilities ──────────────────────────────────────────────────────
+// ── TV frame layout ──────────────────────────────────────────────────────────
+// Wraps content in a retro TV-like container: dark bezel + inner screen
 
-.page-center {
-  min-height: 100vh;
+.tv-frame {
+  position: relative;
+  z-index: 1;
+  background: var(--tv-bezel, #2a2a2a);
+  border-radius: 24px;
+  padding: 14px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  width: 100%;
+  max-width: 540px;
+  box-sizing: border-box;
+  @include bp.sm { padding: 18px; border-radius: 28px; }
+  @include bp.md { max-width: 720px; padding: 20px; border-radius: 32px; }
+  // Landscape is height-constrained — slim the bezel (esp. the bottom band) so the
+  // frame isn't taller than it needs to be and doesn't reach the corner toggles.
+  @include bp.landscape { padding: 8px; border-radius: 16px; }
+}
+
+:root {
+  --tv-bezel: #2a2a2a;
+  --tv-screen-bg: var(--color-surface);
+}
+
+[data-theme='dark'] {
+  --tv-bezel: #2c2c33;
+}
+
+.tv-screen {
+  background: var(--tv-screen-bg);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.15);
+  @include bp.sm { border-radius: 16px; }
+}
+
+// Label strip at the bottom of the bezel
+.tv-label {
+  text-align: center;
+  padding-top: 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.25);
+  @include bp.sm { padding-top: 10px; font-size: 0.7rem; }
+  @include bp.landscape { padding-top: 4px; font-size: 0.6rem; }
+}
+
+// Centered page shell — use on every screen
+.screen-shell {
+  height: 100vh;
+  height: 100dvh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1rem;
+  // Reserve a bottom band so bottom-edge controls (the lobby Start row — which
+  // grows taller with the "waiting for results" note — and the results buttons)
+  // clear the fixed bottom-right sound/theme toggles instead of sitting under
+  // them. The toggles sit ~1rem–3rem up from the viewport bottom. Landscape below.
+  padding: 1.5rem 0.75rem calc(0.75rem + 3rem + env(safe-area-inset-bottom));
   box-sizing: border-box;
-}
-
-.page-card {
-  background: var(--color-surface);
-  border-radius: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-  padding: 2.5rem 2rem;
-  width: 100%;
-}
-
-// ── Shared page header ────────────────────────────────────────────────────────
-// Apply to any page header for the green gradient + confetti style
-
-.page-header {
-  background: linear-gradient(135deg, var(--color-accent) 0%, #3d5340 100%);
-  color: var(--color-primary);
-  padding: 1.25rem 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
-  position: relative;
   overflow: hidden;
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image:
-      radial-gradient(circle, rgba(255,255,255,0.18) 1.5px, transparent 1.5px),
-      radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-    background-size: 32px 32px, 18px 18px;
-    background-position: 0 0, 9px 9px;
-    animation: confettiShift 8s linear infinite;
+  @include bp.sm { padding: 2rem 1rem calc(1rem + 3.25rem + env(safe-area-inset-bottom)); }
+  // Landscape is height-constrained and the bottom controls (lobby Start, the
+  // game ready-pips, results buttons) reach the bottom-right corner where the
+  // fixed sound/theme toggles float. Reserve a bottom band so content lifts clear
+  // of the toggles instead of sitting under them.
+  @include bp.landscape {
+    padding: 0.75rem;
+    // Reserve a right band too: the fixed sound/theme toggles float in the
+    // bottom-right corner, so push the centred frame left of them (otherwise the
+    // lobby's wide frame and the guessing frame slide under the toggle cluster).
+    padding-right: calc(0.75rem + 3.25rem + env(safe-area-inset-right));
+    padding-bottom: calc(0.75rem + 2.25rem + env(safe-area-inset-bottom));
   }
 }
 
-@keyframes confettiShift {
-  from { background-position: 0 0, 9px 9px; }
-  to   { background-position: 32px 32px, 41px 41px; }
+// ── Neon gas-tube sign ────────────────────────────────────────────────────────
+// A subtle, mostly-dead neon sign. Most letters are unlit grey; a few still glow,
+// alternating the brand red/green (same as the home logo) and flickering like a
+// worn tube. Shared across screens — the look is identical everywhere; each page
+// only positions it differently via a --modifier. Hidden in landscape.
+.neon-sign {
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+  animation: neonPowerOn 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  @include bp.landscape { display: none; }
+}
+
+.neon-sign__text {
+  display: flex;
+  flex-direction: column;
+  font-family: 'Press Start 2P', monospace;
+  font-weight: 400;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  text-transform: uppercase;
+  // Pixel font is already wide — a touch of tracking keeps tubes distinct
+  letter-spacing: 0.04em;
+  // Dead tube by default — faint grey, no glow
+  color: var(--neon-dead);
+  animation: neonHum 3.4s linear infinite;
+  @include bp.sm { font-size: 1.05rem; }
+}
+
+.ta-line { display: block; white-space: nowrap; }
+
+// Explicit inter-word gap — Angular strips whitespace-only text nodes between
+// the per-letter spans, so a real space char never survives compilation.
+.ta-gap { display: inline-block; width: 0.5em; }
+
+// Lit letters — these are the tubes with a working light behind them. They rest
+// grey (a dead tube) like every other letter, then flicker up to their brand
+// red/green with a matching halo and fade back to grey, cycling forever. Each
+// runs its colour-cycle keyframes; the .fx-* classes only stagger the timing so
+// no two letters light in step, making the glow travel around the sign.
+// display:inline-block isolates each letter's glow.
+.lit-r,
+.lit-g {
+  display: inline-block;
+  // Rest state: unlit grey, no halo (matches .dead)
+  color: var(--neon-dead);
+}
+
+.lit-r { animation: cycle-r var(--neon-dur, 5.2s) ease-in-out var(--neon-delay, 0s) infinite; }
+.lit-g { animation: cycle-g var(--neon-dur, 5.2s) ease-in-out var(--neon-delay, 0s) infinite; }
+
+// Per-letter stagger. CRITICAL: every variant shares the SAME duration, so the
+// phase relationship between letters is fixed forever and never drifts — the
+// only difference is a delay that spaces them evenly around one cycle (0, ¼, ½,
+// ¾). Combined with the wide lit-window in cycle-r/cycle-g (~18%→84%), any
+// colour that uses ≥3 of these 4 variants is lit somewhere at every instant, so
+// red and green are always both on — no awkward all-one-colour moment. (Earlier
+// these had distinct durations, which drifts out of phase and produces exactly
+// that.) Assignment in the markup guarantees each colour spans the variants.
+.fx-a { --neon-dur: 5.4s; --neon-delay: 0s;    }
+.fx-b { --neon-dur: 5.4s; --neon-delay: 1.35s; }
+.fx-c { --neon-dur: 5.4s; --neon-delay: 2.7s;  }
+.fx-d { --neon-dur: 5.4s; --neon-delay: 4.05s; }
+
+// ── Position modifiers — same sign, different corner per page ──
+// Game (PROMPTING): top-right, poking above the TV frame.
+.neon-sign--game {
+  top: -5.1rem;
+  right: 3rem;
+  .neon-sign__text { align-items: flex-end; text-align: right; }
+}
+
+// Home / join (welcome): top-left, poking above the TV frame.
+.neon-sign--welcome {
+  top: -5.1rem;
+  left: 3rem;
+  .neon-sign__text { align-items: flex-start; text-align: left; }
+}
+
+// Loading (generating): laid out in flow to the right of the phone (see
+// .phone-float, which is a centred flex row) — the phone + label move as one
+// unit and bob together, so the sign never clips regardless of viewport. Unlike
+// the other signs it also stays visible in landscape.
+.neon-sign--loading {
+  position: static;
+  .neon-sign__text { align-items: flex-start; text-align: left; }
+  @include bp.landscape { display: block; }
+}
+
+// Power-on: a couple of stutters before the tube settles, like a real sign
+@keyframes neonPowerOn {
+  0%   { opacity: 0; }
+  10%  { opacity: 0.85; }
+  12%  { opacity: 0.1; }
+  18%  { opacity: 0.95; }
+  21%  { opacity: 0.2; }
+  30%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+@keyframes neonHum {
+  0%, 100% { filter: brightness(1); }
+  46%      { filter: brightness(1); }
+  48%      { filter: brightness(0.9); }
+  50%      { filter: brightness(1.03); }
+  52%      { filter: brightness(0.93); }
+  54%      { filter: brightness(1); }
+}
+
+// ── Colour-cycle keyframes — grey → lit → grey ──────────────────────────────
+// A letter rests as a dead grey tube most of the cycle, then warms up to its
+// brand colour with a worn-tube stutter, holds the glow briefly, and fades back
+// to grey. text-shadow keeps the same 3-layer shape at every step (zero-alpha
+// when off) so the halo interpolates smoothly instead of popping in. The two
+// keyframes are identical apart from the colour + glow hue.
+@keyframes cycle-r {
+  0%, 12% {
+    color: var(--neon-dead);
+    text-shadow:
+      0 0 0 rgba(var(--neon-hue), 0),
+      0 0 0 rgba(var(--neon-hue), 0),
+      0 0 0 rgba(var(--neon-hue), 0);
+  }
+  18%, 23% {                     // strike + stutter as the tube warms up
+    color: var(--color-primary);
+    text-shadow:
+      0 0 5px rgba(var(--neon-hue), 0.95),
+      0 0 12px rgba(var(--neon-hue), 0.8),
+      0 0 26px rgba(var(--neon-hue), 0.5);
+  }
+  20% {                          // brief sputter mid-strike
+    color: var(--neon-dead);
+    text-shadow:
+      0 0 2px rgba(var(--neon-hue), 0.35),
+      0 0 4px rgba(var(--neon-hue), 0.25),
+      0 0 8px rgba(var(--neon-hue), 0.15);
+  }
+  78% {                          // hold full glow — wide window so phases overlap
+    color: var(--color-primary);
+    text-shadow:
+      0 0 5px rgba(var(--neon-hue), 0.95),
+      0 0 12px rgba(var(--neon-hue), 0.8),
+      0 0 26px rgba(var(--neon-hue), 0.5);
+  }
+  84%, 100% {                    // fade back to a dead tube
+    color: var(--neon-dead);
+    text-shadow:
+      0 0 0 rgba(var(--neon-hue), 0),
+      0 0 0 rgba(var(--neon-hue), 0),
+      0 0 0 rgba(var(--neon-hue), 0);
+  }
+}
+
+@keyframes cycle-g {
+  0%, 12% {
+    color: var(--neon-dead);
+    text-shadow:
+      0 0 0 rgba(var(--neon-accent), 0),
+      0 0 0 rgba(var(--neon-accent), 0),
+      0 0 0 rgba(var(--neon-accent), 0);
+  }
+  18%, 23% {
+    color: var(--p-green);
+    text-shadow:
+      0 0 5px rgba(var(--neon-accent), 0.95),
+      0 0 12px rgba(var(--neon-accent), 0.8),
+      0 0 26px rgba(var(--neon-accent), 0.5);
+  }
+  20% {
+    color: var(--neon-dead);
+    text-shadow:
+      0 0 2px rgba(var(--neon-accent), 0.35),
+      0 0 4px rgba(var(--neon-accent), 0.25),
+      0 0 8px rgba(var(--neon-accent), 0.15);
+  }
+  78% {
+    color: var(--p-green);
+    text-shadow:
+      0 0 5px rgba(var(--neon-accent), 0.95),
+      0 0 12px rgba(var(--neon-accent), 0.8),
+      0 0 26px rgba(var(--neon-accent), 0.5);
+  }
+  84%, 100% {
+    color: var(--neon-dead);
+    text-shadow:
+      0 0 0 rgba(var(--neon-accent), 0),
+      0 0 0 rgba(var(--neon-accent), 0),
+      0 0 0 rgba(var(--neon-accent), 0);
+  }
+}
+
+// ── Inline button icon ──────────────────────────────────────────────────────
+// Small pixel-art icon placed inside buttons alongside text
+
+.btn-icon {
+  width: 26px;
+  height: 26px;
+  image-rendering: pixelated;
+  object-fit: contain;
+  flex-shrink: 0;
+  vertical-align: middle;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@media (hover: hover) {
+  button:hover:not([disabled]) .btn-icon {
+    transform: scale(1.25) rotate(-8deg);
+  }
+}
+
+// Check icon swaps to the dark-theme variant in dark theme
+[data-theme='dark'] .btn-icon--check {
+  content: url('/app-icons/promptle-check-dark.svg');
+}
+
+// ── Icon toggle ──────────────────────────────────────────────────────────────
+// Standalone clickable icon — same style as theme toggle (no color filter)
+
+.icon-toggle {
+  width: 1.5rem;
+  height: 1.5rem;
+  cursor: pointer;
+  display: block;
+  image-rendering: pixelated;
+  object-fit: contain;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease;
+  user-select: none;
+  -webkit-user-drag: none;
+
+  @media (hover: hover) {
+    &:hover {
+      transform: scale(1.35);
+      filter: brightness(1.4);
+    }
+  }
+
+  &:active {
+    transform: scale(1.15);
+    filter: brightness(1.6);
+  }
+
+  &.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
 }
 
 // Pixel art avatar rendering
@@ -319,53 +806,131 @@ img.entry-avatar {
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);
   border-radius: 3px;
-  &:hover {
-    background: var(--color-on-surface);
-    opacity: 0.4;
+  @media (hover: hover) {
+    &:hover {
+      background: var(--color-on-surface);
+      opacity: 0.4;
+    }
   }
 }
 
-// ── Angular Material overrides ─────────────────────────────────────────────────
-
-.mat-mdc-form-field {
-  width: 100%;
+// ── iOS input zoom prevention ────────────────────────────────────────────────
+// Mobile Safari zooms the viewport when input font-size < 16px.
+// Force 16px on all form inputs to prevent this.
+input, textarea, select {
+  font-size: 16px !important;
+  @include bp.sm { font-size: inherit !important; }
 }
 
-.mdc-text-field--outlined .mdc-notched-outline__leading,
-.mdc-text-field--outlined .mdc-notched-outline__notch,
-.mdc-text-field--outlined .mdc-notched-outline__trailing {
-  border-color: var(--color-border) !important;
+// ── Safe area insets (notch / Dynamic Island / home indicator) ───────────────
+// Applied to elements that sit at screen edges on notched iPhones.
+body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
 }
 
-.mdc-text-field--focused .mdc-notched-outline__leading,
-.mdc-text-field--focused .mdc-notched-outline__notch,
-.mdc-text-field--focused .mdc-notched-outline__trailing {
-  border-color: var(--color-primary) !important;
-}
+// ── Corner toggles (sound + theme) ──────────────────────────────────────────────
+// Fixed cluster in the bottom-right; sound sits to the left of the theme switch.
 
-// ── Theme toggle ───────────────────────────────────────────────────────────────
-
-.theme-toggle {
+.corner-toggles {
   position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  right: calc(1rem + env(safe-area-inset-right));
   z-index: 1050;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 50%;
-  border: 1px solid var(--p-gray-light);
-  background: var(--bs-body-bg);
-  color: var(--bs-body-color);
-  font-size: 1.1rem;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 0 0 4px;
-  line-height: 1;
+  gap: 0.75rem;
+  @include bp.sm { bottom: calc(1.5rem + env(safe-area-inset-bottom)); right: calc(1.5rem + env(safe-area-inset-right)); }
+  @include bp.landscape {
+    bottom: calc(0.5rem + env(safe-area-inset-bottom));
+    right: calc(0.5rem + env(safe-area-inset-right));
+    gap: 0.55rem;
+  }
+}
 
-  &:hover {
-    background: var(--bs-secondary-bg);
+.corner-toggle {
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+  display: block;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease;
+  user-select: none;
+  -webkit-user-drag: none;
+
+  @media (hover: hover) {
+    &:hover {
+      transform: scale(1.35);
+      filter: brightness(1.4);
+    }
+  }
+
+  &:active {
+    transform: scale(1.15);
+    filter: brightness(1.6);
+  }
+
+  @include bp.landscape {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+}
+
+// Transient "Sound ON/OFF" confirmation — pops above the cluster on toggle,
+// colour-coded (green on / red off) for instant state feedback, then fades.
+.sound-label {
+  position: absolute;
+  // Sit higher above the cluster and centre on the sound icon (the leftmost
+  // 2rem item, so its centre is 1rem from the cluster's left edge).
+  bottom: calc(100% + 0.9rem);
+  left: 1rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--p-red);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  transform: translateX(-50%) translateY(5px) scale(0.96);
+  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+
+  &--on { background: var(--p-green); }
+
+  &--show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+
+  // Landscape shrinks the icons to 1.5rem, so its centre moves to 0.75rem.
+  @include bp.landscape { left: 0.75rem; }
+}
+
+// The sound glyph is a dark pixel icon — readable as-is on the light bg, but it
+// needs flipping light on the dark theme (the theme icon swaps art instead).
+[data-theme='dark'] .sound-toggle {
+  filter: invert(1) brightness(0.95);
+
+  @media (hover: hover) {
+    &:hover { filter: invert(1) brightness(1.3); }
+  }
+  &:active { filter: invert(1) brightness(1.5); }
+}
+
+// ── Reduced motion ─────────────────────────────────────────────────────────────
+// Honor the OS "reduce motion" preference: collapse the app's many looping
+// animations (ambient mesh drift, title shimmer, phone float, timer flash, etc.)
+// and long transitions to near-instant, while keeping the resulting state.
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

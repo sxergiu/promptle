@@ -1,3 +1,7 @@
+@use 'breakpoints' as bp;
+
+// -- Duplicate overlay --
+
 .duplicate-overlay {
   position: fixed;
   inset: 0;
@@ -6,6 +10,7 @@
   align-items: center;
   justify-content: center;
   z-index: 100;
+  padding: 1rem;
   animation: fadeIn 0.2s ease;
 }
 
@@ -17,134 +22,161 @@
 .duplicate-dialog {
   background: var(--color-surface);
   border-radius: 16px;
-  padding: 2rem;
+  padding: 1.5rem;
   text-align: center;
   max-width: 360px;
+  width: 100%;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  @include bp.sm { padding: 2rem; }
 
   p { margin: 0 0 1.5rem; font-size: 1rem; }
 }
 
-/* ── Shell ── */
-.lobby-shell {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+// -- Widen tv-frame for lobby --
+
+:host ::ng-deep .tv-frame {
+  max-width: 680px;
+  @include bp.md { max-width: 860px; }
 }
 
-/* ── Header ── */
-.lobby-header {
-  animation: slideDown 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
+// -- Content --
 
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-20px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.lobby-title {
-  font-size: 0.875rem;
-  font-weight: 800;
-  margin: 0;
-  color: var(--color-primary);
-  position: relative;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  position: relative;
-}
-
-.room-code-badge {
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 0.95rem;
-  font-weight: 800;
-  color: var(--color-primary);
-  background: rgba(153, 0, 48, 0.1);
-  border: 1.5px solid rgba(153, 0, 48, 0.4);
-  border-radius: 999px;
-  padding: 0.2rem 0.8rem;
-  letter-spacing: 0.12em;
-  cursor: pointer;
-  transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
-  user-select: all;
-
-  &:hover {
-    background: rgba(153, 0, 48, 0.18);
-    box-shadow: 0 0 0 3px rgba(153, 0, 48, 0.15);
-  }
-
-  &:active {
-    transform: scale(0.97);
-    animation: copyPulse 0.35s ease;
-  }
-}
-
-@keyframes copyPulse {
-  0%   { box-shadow: 0 0 0 0 rgba(153, 0, 48, 0.35); }
-  70%  { box-shadow: 0 0 0 10px rgba(153, 0, 48, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(153, 0, 48, 0); }
-}
-
-.settings-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--color-primary);
-  opacity: 0.7;
-  transition: opacity 0.2s;
-  &:hover { opacity: 1; }
-}
-
-/* ── Body ── */
-.lobby-body {
-  flex: 1;
+.lobby-content {
+  padding: 1.25rem 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem 1rem;
-  box-sizing: border-box;
-  gap: 1.5rem;
-  text-align: center;
+  // Portrait stacks the CTA buttons in a column, so keep the inter-section gap
+  // tight to leave room for them above the corner toggles.
+  gap: 1rem;
+  @include bp.sm { padding: 2rem 1.25rem; gap: 2rem; }
+  @include bp.landscape { padding: 0.75rem 0.75rem; gap: 0.75rem; }
 }
 
-/* ── Waiting hint ── */
-.waiting-hint {
-  font-size: 0.875rem;
-  color: var(--color-on-surface);
-  opacity: 0.45;
-  margin: 0;
-  text-align: center;
+// -- Top bar --
 
-  &::after {
-    content: '';
-    display: inline-block;
-    animation: waitingDots 1.8s steps(4, end) infinite;
-    overflow: hidden;
-    width: 0;
-    vertical-align: bottom;
-  }
-}
-
-@keyframes waitingDots {
-  0%   { content: ''; }
-  25%  { content: '.'; }
-  50%  { content: '..'; }
-  75%  { content: '...'; }
-  100% { content: ''; }
-}
-
-/* ── Player grid ── */
-.player-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.875rem;
-  justify-content: center;
+.lobby-top-bar {
   width: 100%;
-  max-width: 640px;
+  max-width: 500px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeUp 0.45s ease 0.05s both;
+  @include bp.md { max-width: 640px; }
+}
+
+.btn-icon {
+  width: 26px;
+  height: 26px;
+  image-rendering: pixelated;
+  object-fit: contain;
+  flex-shrink: 0;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: iconPulse 2s ease-in-out 1s 3;
+}
+
+@keyframes iconPulse {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25%  { transform: scale(1.2) rotate(-6deg); }
+  50%  { transform: scale(1) rotate(0deg); }
+}
+
+// -- Player area --
+
+.player-area {
+  width: 100%;
+  max-width: 100%;
   animation: fadeUp 0.45s ease 0.1s both;
+}
+
+.player-area-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-on-surface);
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 0.625rem;
+  @include bp.sm { font-size: 0.9rem; margin-bottom: 0.75rem; }
+}
+
+.player-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  @include bp.sm { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.625rem; }
+  @include bp.landscape { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.35rem; }
+}
+
+// -- CTA buttons --
+
+.lobby-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 500px;
+  animation: fadeUp 0.45s ease 0.3s both;
+  @include bp.md { max-width: 640px; }
+}
+
+.lobby-waiting-note {
+  margin: 0;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.8;
+  color: var(--color-on-surface);
+}
+
+.lobby-cta-row {
+  display: flex;
+  // Mobile portrait: stack the buttons in a column. Source order is LEAVE, INVITE,
+  // START, so use `order` to present them INVITE → START → EXIT top-to-bottom.
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  width: 100%;
+  // Wider screens (and landscape, which is height-constrained) revert to a single
+  // row laid out in source order.
+  @include bp.sm { flex-direction: row; justify-content: space-between; gap: 0.75rem; }
+  @include bp.landscape { flex-direction: row; justify-content: space-between; }
+
+  .btn-invite { order: 1; }
+  .btn-start  { order: 2; }
+  .btn-leave  { order: 3; }
+  @include bp.sm {
+    .btn-leave, .btn-invite, .btn-start { order: 0; }
+  }
+  @include bp.landscape {
+    .btn-leave, .btn-invite, .btn-start { order: 0; }
+  }
+
+  .btn-secondary {
+    @include bp.sm { flex: 0 0 auto; }
+  }
+
+  // LEAVE and START share an equal width on the row layout
+  .btn-leave,
+  .btn-start {
+    @include bp.sm { flex: 0 0 8rem; }
+  }
+
+  .btn-invite {
+    @include bp.sm { flex: 1 1 auto; }
+  }
+}
+
+// LEAVE turns red on hover (destructive action). Base button visuals come
+// from the global .btn-secondary in styles.scss.
+.btn-leave {
+  @media (hover: hover) {
+    &:hover:not(:disabled):not([disabled]) {
+      border-color: var(--color-danger);
+      color: var(--color-danger);
+    }
+  }
 }
 
 @keyframes fadeUp {
@@ -152,15 +184,31 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Actions ── */
-.lobby-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  max-width: 280px;
-  animation: fadeUp 0.45s ease 0.2s both;
+// -- Copy link icon ringing --
+// 3 rings with pauses: ring (0-10%) pause (10-33%) ring (33-43%) pause (43-66%) ring (66-76%) done
 
-  button { width: 100%; }
+.icon-ring {
+  animation: iconRing 3s cubic-bezier(0.36, 0.07, 0.19, 0.97) 0.8s 1 both;
+}
+
+@keyframes iconRing {
+  0%   { transform: rotate(0deg); }
+  3%   { transform: rotate(18deg); }
+  5%   { transform: rotate(-16deg); }
+  7%   { transform: rotate(12deg); }
+  9%   { transform: rotate(-4deg); }
+  11%  { transform: rotate(0deg); }
+  33%  { transform: rotate(0deg); }
+  36%  { transform: rotate(18deg); }
+  38%  { transform: rotate(-16deg); }
+  40%  { transform: rotate(12deg); }
+  42%  { transform: rotate(-4deg); }
+  44%  { transform: rotate(0deg); }
+  66%  { transform: rotate(0deg); }
+  69%  { transform: rotate(18deg); }
+  71%  { transform: rotate(-16deg); }
+  73%  { transform: rotate(12deg); }
+  75%  { transform: rotate(-4deg); }
+  77%  { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
 }

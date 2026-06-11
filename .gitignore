@@ -24,3 +24,7 @@ hs_err_pid*
 replay_pid*
 
 .idea
+.comfyui.pid
+
+# Design docs — kept local, never pushed to GitHub
+promptle-docs/

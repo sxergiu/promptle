@@ -22,17 +22,37 @@ services:
 
       # Image generation — reaches native ComfyUI on the host Mac
       IMAGE_GENERATION_PROVIDER: comfyui
+      # Rounds 2+ generation mode — equal alternatives: image-to-image | text-to-image
+      # (see promptle-docs/fine-tune/cfg-denoise-style-discussion.md). Flip + redeploy to compare.
+      IMAGE_GENERATION_CHAIN_MODE: text-to-image
       IMAGE_GENERATION_COMFYUI_URL: http://host.docker.internal:8188
-      IMAGE_GENERATION_COMFYUI_WORKFLOW: comfyui-workflow-api.json
+      # text-to-image (round 1)
+      IMAGE_GENERATION_COMFYUI_WORKFLOW: workflows/proto-t2i.json
       IMAGE_GENERATION_COMFYUI_PROMPT_NODE_ID: "6"
       IMAGE_GENERATION_COMFYUI_OUTPUT_NODE_ID: "9"
+      # CFG — prompt adherence; 8 = strong adherence, chosen for text-to-image mode (see promptle-docs/fine-tune)
+      IMAGE_GENERATION_COMFYUI_CFG: "8"
+      # image-to-image (round 2+)
+      IMAGE_GENERATION_COMFYUI_IMG2IMG_WORKFLOW: workflows/proto-i2i.json
+      IMAGE_GENERATION_COMFYUI_IMG2IMG_PROMPT_NODE_ID: "8"
+      IMAGE_GENERATION_COMFYUI_IMG2IMG_OUTPUT_NODE_ID: "4"
+      IMAGE_GENERATION_COMFYUI_IMG2IMG_LOAD_IMAGE_NODE_ID: "10"
+      # denoise — headroom for subtractive prompt changes while keeping lineage
+      IMAGE_GENERATION_COMFYUI_IMG2IMG_DENOISE: "0.72"
+      IMAGE_GENERATION_COMFYUI_IMG2IMG_CFG: "7"
+      # art-style attention weight — below 1.0 so style doesn't crowd out player content
+      IMAGE_STYLE_WEIGHT_FIRST_ROUND: "0.6"
+      IMAGE_STYLE_WEIGHT_LATER_ROUNDS: "0.6"
 
       # Image storage — ephemeral tmpfs volume mounted below
       IMAGE_STORAGE_PROVIDER: local
       IMAGE_STORAGE_LOCAL_PATH: /var/promptle-images
 
-      # Timers — generous safety net for M1 serial generation (3-5 players)
-      GAME_TIMER_GENERATING_TIMEOUT_SECONDS: "300"
+      # Timers — generous safety net for M1 serial generation. ComfyUI runs images serially,
+      # so a full 4-8 player round can take several minutes; both caps must exceed that or a
+      # late chain's image never arrives and shows "loading" forever.
+      IMAGE_GENERATION_COMFYUI_POLL_TIMEOUT_SECONDS: "600"
+      GAME_TIMER_GENERATING_TIMEOUT_SECONDS: "700"
 
     # Required so host.docker.internal resolves on Linux; harmless on macOS.
     extra_hosts:

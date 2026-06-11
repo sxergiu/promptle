@@ -48,7 +48,8 @@ class AsyncImageGenerationTest {
     @BeforeEach
     void setUp() {
         service = new ComfyUIGenerationService(imageStorageService, COMFY_URL, restTemplate,
-                WORKFLOW_TEMPLATE, "6", "9");
+                WORKFLOW_TEMPLATE, "6", "9",
+                null, 0.55, "10", "8", "4");
     }
 
     // ---- A-1: @Async annotation present on generateImage ----

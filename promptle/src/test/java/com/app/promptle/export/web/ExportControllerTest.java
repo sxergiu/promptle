@@ -55,9 +55,9 @@ class ExportControllerTest {
                 new ChainEntryDto("player-3", "icon-3", "Golden light on waves", null, false)
         );
         List<PlayerDto> players = List.of(
-                new PlayerDto("player-1", "Alice", "icon-1", true),
-                new PlayerDto("player-2", "Bob", "icon-2", true),
-                new PlayerDto("player-3", "Carol", "icon-3", true)
+                new PlayerDto("player-1", "Alice", "icon-1", true, false),
+                new PlayerDto("player-2", "Bob", "icon-2", true, false),
+                new PlayerDto("player-3", "Carol", "icon-3", true, false)
         );
         return new ExportRequest(new ChainDto(entries), players);
     }
@@ -201,7 +201,7 @@ class ExportControllerTest {
 
         ExportRequest request = new ExportRequest(
                 new ChainDto(List.of()),
-                List.of(new PlayerDto("p1", "Alice", "icon-1", true))
+                List.of(new PlayerDto("p1", "Alice", "icon-1", true, false))
         );
 
         mockMvc.perform(post("/api/export/{roomCode}", roomCode)

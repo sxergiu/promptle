@@ -3,6 +3,8 @@ package com.app.promptle.game.service;
 import com.app.promptle.game.model.*;
 import com.app.promptle.game.repository.*;
 import com.app.promptle.image.api.ImageGenerationService;
+import com.app.promptle.image.api.ImageStorageService;
+import com.app.promptle.image.filter.PromptFilter;
 import com.app.promptle.room.model.Player;
 import com.app.promptle.room.model.Room;
 import com.app.promptle.room.repository.PlayerRepository;
@@ -41,9 +43,12 @@ class ConcurrentSubmissionTest {
     @Mock private PlayerRepository playerRepository;
     @Mock private ChainRepository chainRepository;
     @Mock private ChainEntryRepository chainEntryRepository;
+    @Mock private ArtStyleRepository artStyleRepository;
     @Mock private RoundAssignmentService roundAssignmentService;
     @Mock private TimerService timerService;
     @Mock private ImageGenerationService imageGenerationService;
+    @Mock private ImageStorageService imageStorageService;
+    @Mock private PromptFilter promptFilter;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     private GameService gameService;
@@ -53,17 +58,24 @@ class ConcurrentSubmissionTest {
 
     @BeforeEach
     void setUp() {
+        when(promptFilter.sanitize(any())).thenAnswer(inv -> inv.getArgument(0));
         gameService = new GameService(
                 roomRepository,
                 playerRepository,
                 chainRepository,
                 chainEntryRepository,
+                artStyleRepository,
                 roundAssignmentService,
                 timerService,
                 imageGenerationService,
+                imageStorageService,
+                promptFilter,
                 eventPublisher,
                 PROMPTING_SECONDS,
-                GUESSING_SECONDS
+                GUESSING_SECONDS,
+                0.45,
+                0.45,
+                "image-to-image"
         );
     }
 
@@ -73,6 +85,9 @@ class ConcurrentSubmissionTest {
     void submitPrompt_Concurrent_TwoPlayers_EndPromptingRoundCalledExactlyOnce() throws Exception {
         Room room = buildRoom("CONCURRENT1", GamePhase.PROMPTING);
         room.setCurrentRound(1);
+        // Round-end threshold is room.getTotalRounds() (= player count fixed at game start);
+        // a 2-player game has totalRounds = 2.
+        room.setTotalRounds(2);
 
         UUID p1Id = UUID.randomUUID();
         UUID p2Id = UUID.randomUUID();
@@ -178,7 +193,6 @@ class ConcurrentSubmissionTest {
 
         when(chainEntryRepository.save(any(ChainEntry.class))).thenAnswer(inv -> inv.getArgument(0));
         when(roomRepository.save(any(Room.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(chainEntryRepository.findByChainOrderByRoundAsc(any())).thenReturn(List.of());
 
         // After first save: 1 of 2; after second save: 2 of 2
         AtomicInteger saveCount = new AtomicInteger(0);
@@ -215,15 +229,16 @@ class ConcurrentSubmissionTest {
         assertTrue(doneLatch.await(5, TimeUnit.SECONDS), "Both threads must finish within 5 seconds");
         executor.shutdown();
 
-        // endGuessingRound on the final round sets phase to RESULTS exactly once
+        // endGuessingRound on the final round sets phase to GENERATING (final image
+        // pass before RESULTS) exactly once
         ArgumentCaptor<Room> roomCaptor = ArgumentCaptor.forClass(Room.class);
         verify(roomRepository, atLeastOnce()).save(roomCaptor.capture());
 
-        long resultsTransitions = roomCaptor.getAllValues().stream()
-                .filter(r -> r.getPhase() == GamePhase.RESULTS)
+        long generatingTransitions = roomCaptor.getAllValues().stream()
+                .filter(r -> r.getPhase() == GamePhase.GENERATING)
                 .count();
-        assertEquals(1L, resultsTransitions,
-                "Room must transition to RESULTS exactly once, regardless of concurrent submits");
+        assertEquals(1L, generatingTransitions,
+                "Room must transition to GENERATING exactly once, regardless of concurrent submits");
     }
 
     // ---- Helpers ----

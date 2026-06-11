@@ -1,22 +1,26 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { GuessingPhaseComponent } from './guessing.component';
 import { WebSocketService } from '../../../core/services/websocket.service';
+import { SoundService } from '../../../core/services/sound.service';
 
 describe('GuessingPhaseComponent', () => {
   let component: GuessingPhaseComponent;
   let fixture: ComponentFixture<GuessingPhaseComponent>;
   let wsSpy: jasmine.SpyObj<WebSocketService>;
+  let soundSpy: jasmine.SpyObj<SoundService>;
 
   const ROOM_CODE = 'GAME1234';
   const IMAGE_URL = '/api/images/game/img1';
 
   beforeEach(async () => {
     wsSpy = jasmine.createSpyObj('WebSocketService', ['send', 'connect', 'disconnect', 'subscribe']);
+    soundSpy = jasmine.createSpyObj('SoundService', ['submitConfirm']);
 
     await TestBed.configureTestingModule({
       imports: [GuessingPhaseComponent],
       providers: [
         { provide: WebSocketService, useValue: wsSpy },
+        { provide: SoundService, useValue: soundSpy },
       ],
     }).compileComponents();
 
@@ -40,7 +44,7 @@ describe('GuessingPhaseComponent', () => {
   });
 
   it('input is editable before submission', () => {
-    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    const input = fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
     if (input) {
       expect(input.readOnly).toBeFalse();
     } else {
@@ -116,6 +120,18 @@ describe('GuessingPhaseComponent', () => {
     );
   });
 
+  it('plays the submitConfirm cue on the local player\'s own submission', () => {
+    component.guessText.set('A serene forest');
+    component.onSubmit();
+    expect(soundSpy.submitConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not play submitConfirm on an empty/blocked submission', () => {
+    component.guessText.set('   ');
+    component.onSubmit();
+    expect(soundSpy.submitConfirm).not.toHaveBeenCalled();
+  });
+
   it('sets submitted to true and locks the input after click', () => {
     component.guessText.set('A guess');
     component.onSubmit();
@@ -123,7 +139,7 @@ describe('GuessingPhaseComponent', () => {
 
     expect(component.submitted()).toBeTrue();
 
-    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    const input = fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
     if (input) {
       expect(input.readOnly).toBeTrue();
     }
@@ -137,7 +153,7 @@ describe('GuessingPhaseComponent', () => {
     component.onSubmit();
     fixture.detectChanges();
 
-    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    const input = fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
     if (input) {
       expect(input.readOnly).toBeTrue();
       expect(input.value).toBe(text);
@@ -190,7 +206,7 @@ describe('GuessingPhaseComponent', () => {
       expect(reconnectComponent.submitted()).toBeTrue();
       expect(wsSpy.send).not.toHaveBeenCalled();
 
-      const input = reconnectFixture.nativeElement.querySelector('input') as HTMLInputElement;
+      const input = reconnectFixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
       if (input) {
         expect(input.readOnly).toBeTrue();
       }
@@ -222,7 +238,7 @@ describe('GuessingPhaseComponent', () => {
       expect(reconnectComponent.submitted()).toBeFalse();
       expect(wsSpy.send).not.toHaveBeenCalled();
 
-      const input = reconnectFixture.nativeElement.querySelector('input') as HTMLInputElement;
+      const input = reconnectFixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
       if (input) {
         expect(input.readOnly).toBeFalse();
       }

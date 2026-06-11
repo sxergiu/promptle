@@ -26,4 +26,9 @@ export class RoomApiService {
   resetGame(roomCode: string, token: string): Observable<void> {
     return this.http.post<void>(`/api/rooms/${roomCode}/reset`, null, { params: { token } });
   }
+
+  // Per-player return from the results showcase; the room only resets once everyone is back.
+  leaveResults(roomCode: string, token: string): Observable<void> {
+    return this.http.post<void>(`/api/rooms/${roomCode}/leave-results`, null, { params: { token } });
+  }
 }
