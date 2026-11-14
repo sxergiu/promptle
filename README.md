@@ -72,14 +72,26 @@ Play with friends on the same Wi-Fi using real AI-generated images.
 # 1. Start ComfyUI
 ./scripts/start-comfyui.sh
 
-# 2. Start the app
-docker compose build && docker compose up -d
+# 2. Start the app from the released images (pin one with PROMPTLE_VERSION=proto-6 in .env)
+docker compose pull && docker compose up -d
+#    …or build this checkout instead
+docker compose up -d --build
 
 # 3. Open http://promptle.local (or http://<mac-ip>)
 
 # 4. Shut down
 docker compose down -v
 ```
+
+---
+
+## Releases
+
+Released as numbered prototypes (`proto-5`, `proto-6`, …); each release's notes are in
+[CHANGELOG.md](CHANGELOG.md). Publishing a GitHub release pushes
+`ghcr.io/sxergiu/promptle-backend` and `ghcr.io/sxergiu/promptle-frontend` tagged with that
+prototype. Images start with proto-6. How branches, PRs and releases are made:
+[RELEASING.md](RELEASING.md).
 
 ---
 
