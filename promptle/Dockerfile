@@ -1,5 +1,7 @@
 # --- build stage ---
-FROM maven:3.9-eclipse-temurin-21 AS build
+# On the builder's own platform: the jar runs anywhere, so a multi-platform
+# release build need not run Maven under emulation.
+FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /src
 COPY pom.xml ./
 # Prime the dependency cache separately from source for faster rebuilds
