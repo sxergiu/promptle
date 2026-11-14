@@ -16,10 +16,10 @@ import java.nio.file.Paths;
  * Dev tool — renders a sample chain straight to a GIF (no game flow / DB / server),
  * so you can eyeball export styling, avatars, transitions, and pacing quickly.
  *
- *   mvn test -Dtest=ExportPreviewTest            # (from promptle/, needs ffmpeg + the export assets)
+ *   mvn test -Dtest=ExportPreviewTest -DexcludedGroups=   # (from promptle/, needs ffmpeg + the export assets)
  *
  * Output: promptle/target/export-preview/output.gif (+ the source frame PNGs).
- * Tagged "preview" so it's easy to exclude from CI if desired (-DexcludedGroups=preview).
+ * Tagged "preview", which the pom excludes by default — hence the empty -DexcludedGroups= above.
  * Tweak the chain below to test different text/avatars/lengths.
  */
 @Tag("preview")

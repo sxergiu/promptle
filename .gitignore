@@ -28,3 +28,5 @@ replay_pid*
 
 # Design docs — kept local, never pushed to GitHub
 promptle-docs/
+# Per-host compose overrides (COMFYUI_URL, PROMPTLE_HTTP_BIND)
+.env

@@ -28,6 +28,9 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<!-- Surefire default: the preview test is a dev tool that writes a GIF to target/.
+		     A property rather than plugin config so -DexcludedGroups= can still run it. -->
+		<excludedGroups>preview</excludedGroups>
 	</properties>
 	<dependencies>
 		<dependency>

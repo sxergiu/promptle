@@ -1,0 +1,71 @@
+# The same gates RELEASING.md tells a human to run, so a green run here means
+# what a green run locally means. Linux only: Promptle ships as Linux containers,
+# and nothing in it is installed on a player's machine.
+name: ci
+
+on:
+  push:
+    # proto-* too: items squash into the prototype branch, and its head is
+    # what eventually merges into main.
+    branches: [main, 'proto-*']
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: promptle
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      # The GIF export shells out to ffmpeg, as the image does, and GifEncoderTest
+      # runs it for real rather than mocking the one thing that can break.
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - run: ./mvnw -B test
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: promptle-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # The version the image builds with.
+          node-version: 20
+          cache: npm
+          cache-dependency-path: promptle-app/package-lock.json
+      # --legacy-peer-deps as in the Dockerfile: the tree does not resolve without it.
+      - run: npm ci --legacy-peer-deps
+      - run: npm run build
+      - run: npm run test:ci
+
+  # The tests above never touch a Dockerfile, and the images are what a release
+  # ships. Built for the runner's platform only and not pushed; release.yml
+  # builds both platforms when it matters.
+  image:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: promptle
+          - name: frontend
+            context: promptle-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      # Same cache scope as release.yml, so a release reuses main's build stage.
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: false
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
