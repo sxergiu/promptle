@@ -1,5 +1,7 @@
 # --- build stage ---
-FROM node:20-alpine AS build
+# On the builder's own platform: the bundle is static files, so a multi-platform
+# release build need not run Angular under emulation.
+FROM --platform=$BUILDPLATFORM node:20-alpine AS build
 WORKDIR /src
 COPY package.json package-lock.json ./
 RUN npm ci --legacy-peer-deps
