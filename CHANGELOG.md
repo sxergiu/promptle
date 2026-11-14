@@ -7,4 +7,5 @@ agreement is that there is one place to write them. How a release is made is in
 
 | Release | Date | About |
 |---|---|---|
+| [proto-6](releases/proto-6.md) | 2026-11-15 | CI on every pull request, multi-platform images on GHCR, the proto-N release process |
 | [proto-5](releases/proto-5.md) | 2026-06-12 | Image-to-image chains, per-chain art styles, prompt filtering, the UI revamp and single-player, sounds, reconnection, GIF export (back-filled; tag `proto`) |
