@@ -28,5 +28,8 @@ replay_pid*
 
 # Design docs — kept local, never pushed to GitHub
 promptle-docs/
+# Bachelor thesis, presentation and defense prep — kept local
+faculty/
+.DS_Store
 # Per-host compose overrides (COMFYUI_URL, PROMPTLE_HTTP_BIND)
 .env
