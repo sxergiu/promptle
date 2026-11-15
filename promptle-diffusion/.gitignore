@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.ipynb_checkpoints/
+
+# Large artifacts — keep out of git. Comments go on their own line: git reads
+# a trailing "# ..." as part of the pattern, which then matches nothing.
+# Base SD 1.5 checkpoints (.safetensors, multi-GB)
+models/
+# Per-style training image sets
+datasets/
+# Generated images, eval grids
+outputs/
+# Trained LoRA adapters (.safetensors)
+lora/
+*.ckpt
+*.safetensors
+
+# Local config
+.env

@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "promptle-diffusion"
+version = "0.1.0"
+description = "Style-LoRA training + inference for Promptle (Stable Diffusion 1.5)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    # core inference / training
+    "torch>=2.1",
+    "torchvision>=0.16",
+    "diffusers>=0.27",
+    "transformers>=4.38",
+    "accelerate>=0.27",
+    "peft>=0.10",
+    "safetensors>=0.4",
+    "datasets>=2.18",
+    "Pillow>=10.0",
+    # dataset sourcing
+    "requests>=2.31",
+    # serving (Phase 4)
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+]
+
+[project.optional-dependencies]
+# Evaluation metrics (CLIP style score, FID).
+eval = [
+    "open_clip_torch>=2.24",
+    "pytorch-fid>=0.3",
+    "scikit-learn>=1.4",
+]
+# Memory/speed extras. bitsandbytes is CUDA-only; xformers optional.
+perf = [
+    "bitsandbytes>=0.43; platform_system == 'Linux'",
+    "xformers>=0.0.25; platform_system == 'Linux'",
+]
+notebook = [
+    "jupyter>=1.0",
+    "matplotlib>=3.8",
+]
+
+[tool.setuptools.packages.find]
+include = ["promptle_diffusion*"]
