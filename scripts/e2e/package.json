@@ -6,6 +6,9 @@
   "description": "Drives a full 2-player Promptle game through the UI and screenshots each screen.",
   "scripts": {
     "sim": "node simulate.mjs",
+    "demo:capture": "node demo-capture.mjs",
+    "demo:gif": "node build-gif.mjs",
+    "demo": "node demo-capture.mjs && node build-gif.mjs",
     "setup": "npm install && npx playwright install chromium"
   },
   "devDependencies": {
