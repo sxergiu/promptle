@@ -75,3 +75,53 @@ Example — watch it run:
 ```bash
 HEADED=1 SLOWMO=250 npm run sim
 ```
+
+---
+
+## Demo GIF (the one embedded in the root `README.md`)
+
+`demo-capture.mjs` + `build-gif.mjs` produce `../../assets/demo.gif` — a fast-paced,
+labelled tour of the game's highlight features. Same prerequisites as the sim
+(backend on `:8088`, frontend on `:4200`). With **ComfyUI** running the GIF shows
+real AI images; with the **stub** provider it still works but every image is the
+fixed placeholder.
+
+```bash
+npm run setup    # once — installs playwright + chromium
+npm run demo     # capture, then build the GIF in one go
+```
+
+Or the two stages separately (handy when iterating on pacing/zoom — the capture
+is the slow part, the build is seconds):
+
+```bash
+npm run demo:capture   # drives the UI, records demo-build/{L,G}.webm + markers.json
+npm run demo:gif       # ffmpeg → ../../assets/demo.gif (re-run freely, no re-capture)
+```
+
+**How it works**
+
+- Two capture sessions, because the lobby wants a crowd but the rest reads better
+  small: session **L** = home (avatar shuffle) + a lobby filling to **7 players**;
+  session **G** = a tight **2-player** game (prompting → generating → guessing →
+  results), kept to 2 players so there are only ~4 real image generations before
+  results (each ComfyUI image is slow).
+- Each scene's neon label (the app's own *Press Start 2P* font) is injected into
+  the page and recorded natively, so it's perfectly on-brand — no font wrangling.
+- `markers.json` records each scene's `[start,end]` window; `build-gif.mjs` cuts,
+  trims, speeds up, ken-burns-zooms the punchy scenes, concatenates, and
+  palette-optimises to a GIF.
+
+**Tuning the GIF** (env vars on `demo:gif`):
+
+| Var         | Default | Meaning                                  |
+| ----------- | ------- | ---------------------------------------- |
+| `GIF_WIDTH` | `880`   | output width in px (height keeps aspect) |
+| `GIF_FPS`   | `16`    | output frames per second                 |
+| `GIF_OUT`   | `../../assets/demo.gif` | output path              |
+
+The committed GIF was built with `GIF_WIDTH=760 GIF_FPS=14`. Per-scene pacing
+(`maxDur` + `speed`) lives in the `TUNE` map at the top of `build-gif.mjs`.
+
+> `demo-build/` (the raw `.webm` recordings + intermediates) is git-ignored; only
+> the final `assets/demo.gif` is committed.
